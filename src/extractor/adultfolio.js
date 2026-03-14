@@ -33,8 +33,9 @@ async function extract(page, siteConfig, modelName) {
           const profileHref = el.querySelector('.thumbnailPic')?.getAttribute('href') || '';
           const role = new RegExp(selfPat, 'i').test(profileHref) ? 'self' : 'interlocutor';
           const text = (el.querySelector('[id^="message-content-"]')?.innerText || '').trim();
-          return { role, text };
-        }).filter(m => m.text);
+          const images = [...el.querySelectorAll('[id^="message-content-"] img')].map(img => img.src).filter(Boolean);
+          return { role, text, images };
+        }).filter(m => m.text || m.images.length > 0);
 
         return { url, photographer, messages };
       }, selfPattern);

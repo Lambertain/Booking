@@ -1,11 +1,12 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 const { Bot } = require('grammy');
-const { formatApprovalCard, buildApprovalKeyboard } = require('./messages');
+const { formatApprovalCard, buildApprovalKeyboard, collectPhotographerImages } = require('./messages');
+const { chat: agentChat } = require('../ai/agent');
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// Error handler — don't crash on polling errors
+// Error handler
 bot.catch((err) => {
   console.error('Bot error:', err.message || err);
 });
@@ -15,9 +16,26 @@ const approvalQueue = [];
 let currentApproval = null;
 let currentMessageId = null;
 const editMode = new Map();
+const editMedia = new Map();    // approvalId -> [file paths]
 const callbacks = new Map();
 
 // --- Send approval to chat ---
+
+async function sendPhotographerPhotos(item) {
+  const images = collectPhotographerImages(item.messages);
+  if (images.length === 0) return;
+  // Send up to 5 photos
+  for (const url of images.slice(0, 5)) {
+    try {
+      await bot.api.sendPhoto(CHAT_ID, url, {
+        caption: `📷 Фото от ${item.photographer}`
+      });
+    } catch (err) {
+      // Photo URL might be invalid or blocked, skip silently
+      console.error(`Failed to send photographer photo: ${err.message}`);
+    }
+  }
+}
 
 async function sendNextApproval() {
   if (currentApproval) return;
@@ -35,6 +53,8 @@ async function sendNextApproval() {
       reply_markup: keyboard
     });
     currentMessageId = msg.message_id;
+    // Send photographer's photos if any
+    await sendPhotographerPhotos(item);
   } catch (err) {
     console.error('MarkdownV2 failed, trying plain text:', err.message);
     try {
@@ -91,57 +111,149 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     if (cb) {
       callbacks.delete(approvalId);
-      cb.resolve({ action: 'approve', text: currentApproval.draft, item: cb.item });
+      cb.resolve({
+        action: 'approve',
+        text: currentApproval.draft,
+        media: editMedia.get(approvalId) || [],
+        item: cb.item
+      });
     }
+    editMedia.delete(approvalId);
     currentApproval = null;
     currentMessageId = null;
     sendNextApproval();
   } else if (action === 'edit') {
     editMode.set(approvalId, true);
+    editMedia.set(approvalId, []);
     await ctx.answerCallbackQuery({ text: '✏️ Отправьте исправленный текст' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
-    await bot.api.sendMessage(CHAT_ID, '✏️ Отправьте исправленный текст ответа:');
+    await bot.api.sendMessage(CHAT_ID, '✏️ Отправьте исправленный текст ответа.\nМожно прикрепить фото/файлы — они будут отправлены фотографу.');
   } else if (action === 'skip') {
     await ctx.answerCallbackQuery({ text: '⏭ Пропущено' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     if (cb) {
       callbacks.delete(approvalId);
-      cb.resolve({ action: 'skip', text: null, item: cb.item });
+      cb.resolve({ action: 'skip', text: null, media: [], item: cb.item });
     }
     editMode.delete(approvalId);
+    editMedia.delete(approvalId);
     currentApproval = null;
     currentMessageId = null;
     sendNextApproval();
   }
 });
 
-// --- Text message handler (for EDIT mode) ---
+// --- Text message handler ---
 
 bot.on('message:text', async (ctx) => {
-  if (!currentApproval) return;
-  const approvalId = currentApproval.approvalId;
-  if (!editMode.has(approvalId)) return;
+  const text = ctx.message.text.trim();
 
-  const editedText = ctx.message.text.trim();
-  editMode.delete(approvalId);
+  // EDIT mode: text goes to photographer
+  if (currentApproval && editMode.has(currentApproval.approvalId)) {
+    const approvalId = currentApproval.approvalId;
+    editMode.delete(approvalId);
 
-  const cb = callbacks.get(approvalId);
-  if (cb) {
-    callbacks.delete(approvalId);
-    cb.resolve({ action: 'edit', text: editedText, item: cb.item });
+    const cb = callbacks.get(approvalId);
+    if (cb) {
+      callbacks.delete(approvalId);
+      cb.resolve({
+        action: 'edit',
+        text,
+        media: editMedia.get(approvalId) || [],
+        item: cb.item
+      });
+    }
+    editMedia.delete(approvalId);
+
+    await ctx.reply('✅ Текст принят');
+    currentApproval = null;
+    currentMessageId = null;
+    sendNextApproval();
+    return;
   }
 
-  await ctx.reply('✅ Текст принят');
-  currentApproval = null;
-  currentMessageId = null;
-  sendNextApproval();
+  // Agent mode: chat with Grok
+  try {
+    await ctx.replyWithChatAction('typing');
+    const reply = await agentChat(text);
+    if (reply) {
+      await ctx.reply(reply);
+    }
+  } catch (err) {
+    console.error('[agent] Chat error:', err.message);
+    await ctx.reply('⚠️ Ошибка агента: ' + err.message);
+  }
 });
+
+// --- Media handler (photos, documents) ---
+
+bot.on('message:photo', async (ctx) => {
+  await handleMedia(ctx, 'photo');
+});
+
+bot.on('message:document', async (ctx) => {
+  await handleMedia(ctx, 'document');
+});
+
+async function handleMedia(ctx, type) {
+  // In EDIT mode: collect media for photographer
+  if (currentApproval && editMode.has(currentApproval.approvalId)) {
+    const approvalId = currentApproval.approvalId;
+    const files = editMedia.get(approvalId) || [];
+
+    let fileId;
+    if (type === 'photo') {
+      // Get highest resolution
+      const photos = ctx.message.photo;
+      fileId = photos[photos.length - 1].file_id;
+    } else {
+      fileId = ctx.message.document.file_id;
+    }
+
+    // Download file
+    const file = await ctx.api.getFile(fileId);
+    const filePath = file.file_path;
+    const downloadUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`;
+
+    // Save to temp
+    const fs = require('fs');
+    const path = require('path');
+    const tmpDir = path.resolve(__dirname, '../../data/tmp');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const ext = path.extname(filePath) || (type === 'photo' ? '.jpg' : '');
+    const localPath = path.join(tmpDir, `${approvalId}-${files.length}${ext}`);
+
+    const res = await fetch(downloadUrl);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(localPath, buffer);
+
+    files.push(localPath);
+    editMedia.set(approvalId, files);
+
+    const caption = ctx.message.caption || '';
+    await ctx.reply(`📎 Файл добавлен (${files.length}). ${caption ? 'Отправьте текст ответа.' : 'Можно добавить ещё или отправить текст ответа.'}`);
+    return;
+  }
+
+  // Outside EDIT mode: media with caption → agent chat
+  const caption = ctx.message.caption || '';
+  if (caption) {
+    try {
+      await ctx.replyWithChatAction('typing');
+      const reply = await agentChat(`[Отправлено ${type === 'photo' ? 'фото' : 'документ'}] ${caption}`);
+      if (reply) await ctx.reply(reply);
+    } catch (err) {
+      console.error('[agent] Media caption chat error:', err.message);
+    }
+  } else {
+    await ctx.reply(`📎 Получен ${type === 'photo' ? 'снимок' : 'файл'}. Напишите что с ним сделать.`);
+  }
+}
 
 // --- Bot lifecycle ---
 
 async function startBot() {
   console.log('Telegram bot starting...');
-  // Drop pending updates to avoid conflicts
   await bot.api.deleteWebhook({ drop_pending_updates: true });
   await new Promise(r => setTimeout(r, 1000));
 

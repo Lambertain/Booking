@@ -33,4 +33,14 @@ function truncate(text, max) {
   return text.slice(0, max) + '...';
 }
 
-module.exports = { formatApprovalCard, buildApprovalKeyboard, escapeMarkdown };
+function collectPhotographerImages(messages) {
+  const images = [];
+  for (const m of messages || []) {
+    if (m.role === 'interlocutor' && m.images && m.images.length > 0) {
+      images.push(...m.images);
+    }
+  }
+  return images;
+}
+
+module.exports = { formatApprovalCard, buildApprovalKeyboard, escapeMarkdown, collectPhotographerImages };
