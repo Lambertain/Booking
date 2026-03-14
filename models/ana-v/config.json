@@ -1,0 +1,44 @@
+{
+  "modelName": "Ana V",
+  "adspower": {
+    "profileId": "k123o21g"
+  },
+  "sites": [
+    {
+      "id": "model-kartei",
+      "label": "Model-Kartei",
+      "baseUrl": "https://www.model-kartei.de/",
+      "messageUrl": "https://www.model-kartei.de/pn/",
+      "unreadUrl": "https://www.model-kartei.de/pn/unread/",
+      "selectors": {
+        "dialogItem": ".lWrapper",
+        "dialogOpenTarget": "a[href*='/pn/']",
+        "messageRow": ".mailWrapper",
+        "messageText": ".mailContent p",
+        "messageAuthorSelf": ".mailWrapper.sedcard1",
+        "messageAuthorOther": ".mailWrapper.sedcard2"
+      }
+    },
+    {
+      "id": "adultfolio",
+      "label": "adultfolio.com",
+      "baseUrl": "https://adultfolio.com/",
+      "messageUrl": "https://adultfolio.com/messaging.php",
+      "selfProfilePattern": "Ana_Voloshina",
+      "replyForm": {
+        "formSelector": "form#Reply",
+        "editorSelector": "div.note-editable.panel-body",
+        "textareaSelector": "textarea#message",
+        "submitSelector": "form#Reply .message_button_class",
+        "fileInputSelector": "form#Reply input[type=file][name='files']"
+      }
+    },
+    {
+      "id": "modelmayhem",
+      "label": "Model Mayhem",
+      "baseUrl": "https://www.modelmayhem.com/",
+      "messageUrl": "https://www.modelmayhem.com/mystuff#/inbox",
+      "selfProfileId": "4703384"
+    }
+  ]
+}
