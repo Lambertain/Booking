@@ -209,4 +209,66 @@ Respond with EXACTLY one word: STANDARD or CUSTOM`;
   return answer.startsWith('STANDARD') ? 'standard' : 'custom';
 }
 
-module.exports = { generateDraft, qualifyDialog, classifyDraft };
+async function extractShootDetails(messages, photographer, site) {
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) throw new Error('Missing XAI_API_KEY env');
+
+  const history = messages
+    .map(m => `[${m.role === 'self' ? 'MODEL' : 'PHOTOGRAPHER'}]: ${m.text}`)
+    .join('\n');
+
+  const systemPrompt = `You extract photo shoot booking details from conversations between a model and a photographer.
+Extract whatever details are available. If a detail is not mentioned, set it to null.
+For dates, use ISO 8601 format (e.g. "2026-05-15T10:00:00.000Z"). If only date without time, use T00:00:00.000Z.
+For budget, extract the number only (e.g. 150, not "150€").
+For duration, extract hours as a number (e.g. 3).
+
+Respond with ONLY a valid JSON object, no markdown, no explanation:
+{
+  "city": "city and/or country" or null,
+  "location": "specific studio/address" or null,
+  "startTime": "ISO 8601 datetime" or null,
+  "durationHours": number or null,
+  "budget": number or null,
+  "expenses": number or null,
+  "style": "shooting style/level description" or null,
+  "notes": "any other relevant details" or null,
+  "status": "Резерв" or "Подтверждено"
+}`;
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Site: ${site}\nPhotographer: ${photographer}\n\nConversation:\n${history}\n\nExtract shoot details:` }
+      ],
+      temperature: 0.0,
+      max_tokens: 300
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Grok extract error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  const raw = (data.choices?.[0]?.message?.content || '').trim();
+
+  try {
+    // Strip markdown code fences if present
+    const json = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '');
+    return JSON.parse(json);
+  } catch {
+    console.error('[grok] Failed to parse shoot details JSON:', raw);
+    return null;
+  }
+}
+
+module.exports = { generateDraft, qualifyDialog, classifyDraft, extractShootDetails };

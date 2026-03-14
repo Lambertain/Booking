@@ -4,9 +4,10 @@ const { openPage } = require('../extractor/adspower');
 const modelKartei = require('../extractor/model-kartei');
 const adultfolio = require('../extractor/adultfolio');
 const modelmayhem = require('../extractor/modelmayhem');
-const { generateDraft, qualifyDialog, classifyDraft } = require('../ai/grok');
+const { generateDraft, qualifyDialog, classifyDraft, extractShootDetails } = require('../ai/grok');
 const { queueApproval } = require('../bot/index');
 const { sendReply } = require('../extractor/sender');
+const { recordShoot } = require('../airtable/index');
 
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 const DATA_DIR = path.resolve(__dirname, '../../data');
@@ -189,6 +190,7 @@ async function runPipelineForModel(modelSlug) {
           const finalText = result.action === 'edit' ? result.text : (result.text || draft);
           await trySendReply(config, item, finalText);
           logApprovedResponse(modelSlug, item, finalText, result.action);
+          await tryRecordShoot(item);
           console.log(`[pipeline] ${result.action === 'approve' ? '✅' : '✏️'} ${item.photographer}: reply sent`);
         } else {
           console.log(`[pipeline] ⏭ Skipped: ${item.photographer}`);
@@ -198,6 +200,7 @@ async function runPipelineForModel(modelSlug) {
         console.log(`[pipeline] 📤 Auto-sending to ${item.photographer}`);
         await trySendReply(config, item, draft);
         logApprovedResponse(modelSlug, item, draft, 'auto');
+        await tryRecordShoot(item);
         try {
           const { bot } = require('../bot/index');
           await bot.api.sendMessage(process.env.TELEGRAM_CHAT_ID,
@@ -226,6 +229,23 @@ async function trySendReply(config, item, text) {
     console.log(`[pipeline] Reply sent to ${item.photographer} on ${item.siteLabel}`);
   } catch (err) {
     console.error(`[pipeline] Failed to send reply to ${item.photographer}: ${err.message}`);
+  }
+}
+
+async function tryRecordShoot(item) {
+  try {
+    const details = await extractShootDetails(item.messages, item.photographer, item.siteLabel);
+    if (!details) {
+      console.log(`[pipeline] No shoot details extracted for ${item.photographer}`);
+      return;
+    }
+    await recordShoot({
+      ...details,
+      photographer: item.photographer,
+      siteName: item.siteLabel
+    });
+  } catch (err) {
+    console.error(`[pipeline] Airtable record failed for ${item.photographer}: ${err.message}`);
   }
 }
 
