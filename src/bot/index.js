@@ -6,6 +6,17 @@ const { chat: agentChat } = require('../ai/agent');
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+const MODEL_INFO_CARD = `📋 Для добавления модели мне нужны данные:
+
+1️⃣ Имя модели (напр: Katya S)
+2️⃣ AdsPower Profile ID
+3️⃣ Сайты: model-kartei / adultfolio / modelmayhem
+4️⃣ Adultfolio username (если есть)
+5️⃣ ModelMayhem profile ID (если есть)
+
+Пример:
+Katya S, adspower k456abc, сайты model-kartei и adultfolio, adultfolio username Katya_S`;
+
 // Error handler
 bot.catch((err) => {
   console.error('Bot error:', err.message || err);
@@ -177,7 +188,14 @@ bot.on('message:text', async (ctx) => {
     await ctx.replyWithChatAction('typing');
     const reply = await agentChat(text);
     if (reply) {
-      await ctx.reply(reply);
+      // Check for model info request card
+      if (reply.includes('REQUEST_MODEL_INFO')) {
+        const cleanReply = reply.replace(/REQUEST_MODEL_INFO/g, '').trim();
+        if (cleanReply) await ctx.reply(cleanReply);
+        await bot.api.sendMessage(CHAT_ID, MODEL_INFO_CARD);
+      } else {
+        await ctx.reply(reply);
+      }
     }
   } catch (err) {
     console.error('[agent] Chat error:', err.message);

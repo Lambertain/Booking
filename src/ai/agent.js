@@ -7,9 +7,181 @@ const MODEL = 'grok-3-mini-fast';
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 const DATA_DIR = path.resolve(__dirname, '../../data');
 
-// Per-chat conversation history (last N messages)
 const chatHistory = [];
 const MAX_HISTORY = 30;
+
+// --- Model management ---
+
+const SITE_TEMPLATES = {
+  'model-kartei': {
+    id: 'model-kartei',
+    label: 'Model-Kartei',
+    baseUrl: 'https://www.model-kartei.de/',
+    messageUrl: 'https://www.model-kartei.de/pn/',
+    unreadUrl: 'https://www.model-kartei.de/pn/unread/',
+    selectors: {
+      dialogItem: '.lWrapper',
+      dialogOpenTarget: "a[href*='/pn/']",
+      messageRow: '.mailWrapper',
+      messageText: '.mailContent p',
+      messageAuthorSelf: '.mailWrapper.sedcard1',
+      messageAuthorOther: '.mailWrapper.sedcard2'
+    }
+  },
+  'adultfolio': {
+    id: 'adultfolio',
+    label: 'adultfolio.com',
+    baseUrl: 'https://adultfolio.com/',
+    messageUrl: 'https://adultfolio.com/messaging.php',
+    selfProfilePattern: '',
+    replyForm: {
+      formSelector: 'form#Reply',
+      editorSelector: 'div.note-editable.panel-body',
+      textareaSelector: 'textarea#message',
+      submitSelector: 'form#Reply .message_button_class',
+      fileInputSelector: "form#Reply input[type=file][name='files']"
+    }
+  },
+  'modelmayhem': {
+    id: 'modelmayhem',
+    label: 'Model Mayhem',
+    baseUrl: 'https://www.modelmayhem.com/',
+    messageUrl: 'https://www.modelmayhem.com/mystuff#/inbox',
+    selfProfileId: ''
+  }
+};
+
+const PROFILE_TEMPLATE = {
+  'reply-engine.md': (name) => `# ${name} reply engine
+
+## Core instruction
+Reply as ${name}.
+
+## Language
+- Use the interlocutor's language
+
+## Tone
+- Polite
+- Businesslike
+- Calm
+
+## Length
+- Short but natural
+- Usually 2-6 sentences
+
+## Reply order
+1. Answer the direct question
+2. Add availability / rate / conditions if relevant
+3. Ask only the necessary follow-up question(s)
+4. End with a brief professional sign-off
+
+## Do not
+- flirt by default
+- add emotional fluff
+- invent availability or discounts
+- paste long boilerplate when a short answer is enough
+`,
+  'rules.md': (name) => `# ${name} rules
+
+## Default reply policy
+- Reply in the interlocutor's language
+- Keep tone polite and businesslike
+- For ambiguous cases: prepare draft, do not auto-send
+
+## When discussing bookings
+Ask for: date, time, duration, level/style, location, travel coverage
+
+## Inbox qualification rule
+Draft a reply only when the photographer shows real interest.
+`,
+  'style.md': (name) => `# ${name} style
+
+## Core voice
+- Polite, businesslike, direct
+- Friendly but not chatty
+- Short practical replies in ongoing logistics
+`,
+  'templates.md': (name) => `# ${name} templates
+
+## 1. Clarifying conditions
+Hello [Name],
+Yes, that could work.
+Please confirm the date, start time, duration, shooting level, and address.
+Best regards,
+${name.split(' ')[0]}
+
+## 2. Short confirmation
+Hello [Name],
+Yes, great. That works for me.
+See you on [date/time].
+Best regards,
+${name.split(' ')[0]}
+
+## 3. Soft decline
+Hello [Name],
+Not this time, but feel free to contact me again later.
+Best regards,
+${name.split(' ')[0]}
+`
+};
+
+function createModel(slug, modelName, adspowerProfileId, siteIds) {
+  const modelDir = path.join(MODELS_DIR, slug);
+  if (fs.existsSync(modelDir)) {
+    return { ok: false, error: `Модель ${slug} уже существует` };
+  }
+
+  fs.mkdirSync(path.join(modelDir, 'profile'), { recursive: true });
+
+  // config.json
+  const sites = siteIds
+    .map(id => SITE_TEMPLATES[id])
+    .filter(Boolean)
+    .map(s => ({ ...s }));
+
+  const config = {
+    modelName,
+    adspower: { profileId: adspowerProfileId },
+    sites
+  };
+  fs.writeFileSync(path.join(modelDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+
+  // Profile files
+  for (const [file, template] of Object.entries(PROFILE_TEMPLATE)) {
+    fs.writeFileSync(path.join(modelDir, 'profile', file), template(modelName), 'utf8');
+  }
+
+  return { ok: true, slug, modelName };
+}
+
+function removeModel(slug) {
+  const modelDir = path.join(MODELS_DIR, slug);
+  if (!fs.existsSync(modelDir)) {
+    return { ok: false, error: `Модель ${slug} не найдена` };
+  }
+  fs.rmSync(modelDir, { recursive: true, force: true });
+
+  // Also remove data
+  const dataDir = path.join(DATA_DIR, slug);
+  if (fs.existsSync(dataDir)) {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+
+  return { ok: true, slug };
+}
+
+function listModels() {
+  try {
+    return fs.readdirSync(MODELS_DIR)
+      .filter(f => fs.existsSync(path.join(MODELS_DIR, f, 'config.json')))
+      .map(slug => {
+        const config = JSON.parse(fs.readFileSync(path.join(MODELS_DIR, slug, 'config.json'), 'utf8'));
+        return { slug, name: config.modelName, sites: config.sites.map(s => s.label) };
+      });
+  } catch { return []; }
+}
+
+// --- Profile loading ---
 
 function loadAllModelProfiles() {
   const slugs = fs.readdirSync(MODELS_DIR).filter(f =>
@@ -33,6 +205,8 @@ function saveModelNotes(slug, notes) {
   fs.writeFileSync(path.join(dir, 'agent-notes.json'), JSON.stringify(notes, null, 2), 'utf8');
 }
 
+// --- System prompt ---
+
 function buildSystemPrompt() {
   const models = loadAllModelProfiles();
 
@@ -48,30 +222,53 @@ ${notesList ? '  Notes:\n' + notesList : '  Notes: (none)'}`;
   return `Ты — AI-агент букер для фотомоделей. Ты помогаешь менеджеру управлять моделями и съёмками.
 
 МОДЕЛИ:
-${modelSections}
+${modelSections || '(нет моделей)'}
 
 ЧТО ТЫ МОЖЕШЬ:
-1. Отвечать на вопросы о моделях, их расценках, доступности, предпочтениях
-2. Запоминать новую информацию о моделях (ставки, правила, нюансы)
+1. Отвечать на вопросы о моделях, расценках, доступности, предпочтениях
+2. Запоминать новую информацию (ставки, правила, нюансы)
 3. Давать советы по переговорам с фотографами
-4. Обсуждать стратегию
+4. Добавлять и удалять модели из пайплайна
 
-КОГДА МЕНЕДЖЕР СООБЩАЕТ НОВУЮ ИНФОРМАЦИЮ О МОДЕЛИ:
-Если менеджер сообщает факт о модели (ставки, правила, доступность, предпочтения), ты ДОЛЖЕН ответить в формате:
+СОХРАНЕНИЕ ИНФОРМАЦИИ О МОДЕЛИ:
+Если менеджер сообщает факт, ответь с командой на отдельной строке:
 SAVE:<slug>:<ключ>:<значение>
 
+УПРАВЛЕНИЕ МОДЕЛЯМИ:
+Для добавления модели нужны ВСЕ данные:
+- Имя модели
+- AdsPower profile ID
+- Сайты (model-kartei, adultfolio, modelmayhem)
+- selfProfilePattern для adultfolio (имя в URL профиля)
+- selfProfileId для modelmayhem (числовой ID)
+
+Если менеджер просит добавить модель но НЕ указал все данные — запроси их через:
+REQUEST_MODEL_INFO
+
+Если ВСЕ данные есть — создай модель:
+ADD_MODEL:<slug>:<Имя Фамилия>:<adspower_profile_id>:<site1,site2,...>
+
+Для удаления:
+REMOVE_MODEL:<slug>
+
+Обновление config модели (selfProfilePattern, selfProfileId и т.д.):
+CONFIG_SET:<slug>:<json_path>:<value>
+
 Примеры:
-- "ставка Аны за ню 180€/ч" → SAVE:ana-v:rate_nude:180€/h
-- "Ана не работает с TFP" → SAVE:ana-v:no_tfp:true
-- "Ана доступна в Бельгии 13-18 мая" → SAVE:ana-v:availability_may:Belgium 13-18 May
+- "добавь модель" без деталей → запроси данные через REQUEST_MODEL_INFO
+- "добавь модель Katya S, adspower xyz123, сайты model-kartei и adultfolio, adultfolio username Katya_S"
+  → ADD_MODEL:katya-s:Katya S:xyz123:model-kartei,adultfolio
+  → CONFIG_SET:katya-s:sites.adultfolio.selfProfilePattern:Katya_S
+- "удали модель katya-s"
+  → REMOVE_MODEL:katya-s
+- "modelmayhem id для Katya 9876543"
+  → CONFIG_SET:katya-s:sites.modelmayhem.selfProfileId:9876543
 
-Формат SAVE должен быть на ОТДЕЛЬНОЙ строке в конце твоего ответа.
-Можно несколько SAVE подряд.
-Если нечего сохранять — не пиши SAVE.
-
-ЯЗЫК: отвечай на русском.
-Будь кратким и по делу.`;
+Команды пиши на ОТДЕЛЬНОЙ строке в конце ответа.
+ЯЗЫК: отвечай на русском. Будь кратким.`;
 }
+
+// --- Chat ---
 
 async function chat(userMessage) {
   const apiKey = process.env.XAI_API_KEY;
@@ -111,42 +308,107 @@ async function chat(userMessage) {
 
   chatHistory.push({ role: 'assistant', content: reply });
 
-  // Process SAVE commands
-  const saves = [];
+  // Process commands
+  const actions = [];
   const lines = reply.split('\n');
   const displayLines = [];
 
   for (const line of lines) {
+    // SAVE
     const saveMatch = line.match(/^SAVE:([^:]+):([^:]+):(.+)$/);
     if (saveMatch) {
       const [, slug, key, value] = saveMatch;
-      saves.push({ slug: slug.trim(), key: key.trim(), value: value.trim() });
-    } else {
-      displayLines.push(line);
+      actions.push({ type: 'save', slug: slug.trim(), key: key.trim(), value: value.trim() });
+      continue;
     }
+    // ADD_MODEL
+    const addMatch = line.match(/^ADD_MODEL:([^:]+):([^:]+):([^:]+):(.+)$/);
+    if (addMatch) {
+      const [, slug, name, profileId, sitesStr] = addMatch;
+      const siteIds = sitesStr.trim().split(',').map(s => s.trim());
+      actions.push({ type: 'add_model', slug: slug.trim(), name: name.trim(), profileId: profileId.trim(), siteIds });
+      continue;
+    }
+    // REMOVE_MODEL
+    const removeMatch = line.match(/^REMOVE_MODEL:(.+)$/);
+    if (removeMatch) {
+      actions.push({ type: 'remove_model', slug: removeMatch[1].trim() });
+      continue;
+    }
+    // CONFIG_SET
+    const configMatch = line.match(/^CONFIG_SET:([^:]+):([^:]+):(.+)$/);
+    if (configMatch) {
+      actions.push({ type: 'config_set', slug: configMatch[1].trim(), path: configMatch[2].trim(), value: configMatch[3].trim() });
+      continue;
+    }
+    // REQUEST_MODEL_INFO — pass through to display
+    if (line.trim() === 'REQUEST_MODEL_INFO') {
+      displayLines.push(line);
+      continue;
+    }
+    displayLines.push(line);
   }
 
-  // Execute saves
-  for (const s of saves) {
+  // Execute actions
+  const actionResults = [];
+  for (const a of actions) {
     try {
-      const models = loadAllModelProfiles();
-      const model = models.find(m => m.slug === s.slug);
-      if (model) {
-        model.notes[s.key] = s.value;
-        saveModelNotes(s.slug, model.notes);
-        console.log(`[agent] Saved ${s.slug}: ${s.key} = ${s.value}`);
+      if (a.type === 'save') {
+        const models = loadAllModelProfiles();
+        const model = models.find(m => m.slug === a.slug);
+        if (model) {
+          model.notes[a.key] = a.value;
+          saveModelNotes(a.slug, model.notes);
+          actionResults.push(`💾 ${a.key}: ${a.value}`);
+        }
+      } else if (a.type === 'add_model') {
+        const result = createModel(a.slug, a.name, a.profileId, a.siteIds);
+        if (result.ok) {
+          actionResults.push(`✅ Модель ${a.name} (${a.slug}) добавлена`);
+        } else {
+          actionResults.push(`⚠️ ${result.error}`);
+        }
+      } else if (a.type === 'remove_model') {
+        const result = removeModel(a.slug);
+        if (result.ok) {
+          actionResults.push(`🗑 Модель ${a.slug} удалена`);
+        } else {
+          actionResults.push(`⚠️ ${result.error}`);
+        }
+      } else if (a.type === 'config_set') {
+        const configPath = path.join(MODELS_DIR, a.slug, 'config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          // Parse path like "sites.adultfolio.selfProfilePattern"
+          const parts = a.path.split('.');
+          if (parts[0] === 'sites' && parts.length === 3) {
+            const site = config.sites.find(s => s.id === parts[1]);
+            if (site) {
+              site[parts[2]] = a.value;
+              fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+              actionResults.push(`⚙️ ${a.slug}: ${parts[1]}.${parts[2]} = ${a.value}`);
+            } else {
+              actionResults.push(`⚠️ Сайт ${parts[1]} не найден у ${a.slug}`);
+            }
+          } else {
+            actionResults.push(`⚠️ Неизвестный путь: ${a.path}`);
+          }
+        } else {
+          actionResults.push(`⚠️ Модель ${a.slug} не найдена`);
+        }
       }
     } catch (err) {
-      console.error(`[agent] Save failed: ${err.message}`);
+      console.error(`[agent] Action failed: ${err.message}`);
+      actionResults.push(`⚠️ Ошибка: ${err.message}`);
     }
   }
 
   const displayText = displayLines.join('\n').trim();
-  const savedInfo = saves.length > 0
-    ? '\n\n💾 ' + saves.map(s => `${s.key}: ${s.value}`).join(', ')
+  const actionsInfo = actionResults.length > 0
+    ? '\n\n' + actionResults.join('\n')
     : '';
 
-  return displayText + savedInfo;
+  return displayText + actionsInfo;
 }
 
-module.exports = { chat };
+module.exports = { chat, listModels };
