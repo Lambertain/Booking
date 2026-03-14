@@ -10,20 +10,44 @@ function isUiNoise(text) {
 
 async function discoverDialogUrls(page, site) {
   const sel = site.selectors;
-  await page.goto(site.unreadUrl || site.messageUrl, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2000);
 
-  let urls = await page.evaluate(({ itemSel, linkSel }) => {
-    const rows = [...document.querySelectorAll(itemSel)];
-    return [...new Set(rows.map(r => r.querySelector(linkSel)?.href).filter(Boolean))];
-  }, { itemSel: sel.dialogItem, linkSel: sel.dialogOpenTarget });
+  // Try unread first, then all messages
+  const pagesToTry = [site.unreadUrl, site.messageUrl].filter(Boolean);
 
-  return urls.slice(0, 22);
+  for (const url of pagesToTry) {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4000);
+
+    // Primary: find links inside .lWrapper containers
+    let urls = await page.evaluate(({ itemSel, linkSel }) => {
+      const rows = [...document.querySelectorAll(itemSel)];
+      return [...new Set(rows.map(r => r.querySelector(linkSel)?.href).filter(Boolean))];
+    }, { itemSel: sel.dialogItem, linkSel: sel.dialogOpenTarget });
+
+    // Fallback: find all dialog links by pattern /pn/\d+/
+    if (urls.length === 0) {
+      urls = await page.evaluate(() => {
+        return [...new Set(
+          [...document.querySelectorAll('a[href*="/pn/"]')]
+            .map(a => a.href)
+            .filter(href => /\/pn\/\d+\/?$/.test(href))
+        )];
+      });
+    }
+
+    if (urls.length > 0) {
+      console.log(`  model-kartei: found ${urls.length} dialog URLs from ${url}`);
+      return urls.slice(0, 22);
+    }
+  }
+
+  console.log('  model-kartei: no dialog URLs found on any page');
+  return [];
 }
 
 async function extractSingleDialog(page, sel, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000);
 
   const messages = await page.evaluate(({ rowSel, textSel, selfSel }) => {
     return [...document.querySelectorAll(rowSel)].map(row => {
