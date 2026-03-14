@@ -1,7 +1,8 @@
 const { openPage } = require('./adspower');
 
 async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFiles = []) {
-  const { browser, page } = await openPage(profileId);
+  const session = await openPage(profileId);
+  const { page } = session;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(5000);
@@ -43,7 +44,7 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
 
     return { ok: true, url };
   } finally {
-    await browser.close();
+    await session.close();
   }
 }
 

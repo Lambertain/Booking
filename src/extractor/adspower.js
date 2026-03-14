@@ -40,7 +40,13 @@ async function openPage(profileId) {
   const browser = await chromium.connectOverCDP(cdp, { timeout: 120000 });
   const context = browser.contexts()[0] || await browser.newContext();
   const page = context.pages()[0] || await context.newPage();
-  return { browser, context, page };
+
+  async function close() {
+    try { await browser.close(); } catch {}
+    await stopProfile(profileId);
+  }
+
+  return { browser, context, page, close };
 }
 
 module.exports = { openPage, startProfile, stopProfile };

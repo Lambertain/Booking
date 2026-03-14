@@ -17,7 +17,8 @@ async function test() {
   const modelDir = path.join(MODELS_DIR, 'ana-v');
 
   console.log(`Opening AdsPower profile for ${modelName} (${profileId})...`);
-  const { browser, page } = await openPage(profileId);
+  const session = await openPage(profileId);
+  const { page } = session;
   console.log('Browser connected!\n');
 
   const allDialogs = {};
@@ -47,7 +48,7 @@ async function test() {
     }
   }
 
-  await browser.close();
+  await session.close();
   console.log('\nBrowser closed.\n');
 
   // Qualify all with Grok

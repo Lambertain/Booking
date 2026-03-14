@@ -104,10 +104,10 @@ async function runPipelineForModel(modelSlug) {
 
   console.log(`[pipeline] Starting scan for ${modelName}...`);
 
-  // 1. Extract dialogs from all sites
-  let browser, page;
+  // 1. Extract dialogs from all sites — open browser, extract, close
+  let session;
   try {
-    ({ browser, page } = await openPage(profileId));
+    session = await openPage(profileId);
   } catch (err) {
     console.error(`[pipeline] Failed to open AdsPower for ${modelName}: ${err.message}`);
     return;
@@ -115,21 +115,23 @@ async function runPipelineForModel(modelSlug) {
 
   const allDialogs = [];
 
-  for (const siteConfig of config.sites) {
-    const extractor = extractors[siteConfig.id];
-    if (!extractor) continue;
+  try {
+    for (const siteConfig of config.sites) {
+      const extractor = extractors[siteConfig.id];
+      if (!extractor) continue;
 
-    try {
-      console.log(`[pipeline] Extracting from ${siteConfig.label}...`);
-      const dialogs = await extractor.extract(page, siteConfig, modelName);
-      console.log(`[pipeline] ${siteConfig.label}: ${dialogs.length} dialogs extracted`);
-      allDialogs.push(...dialogs);
-    } catch (err) {
-      console.error(`[pipeline] ${siteConfig.label} extraction failed: ${err.message}`);
+      try {
+        console.log(`[pipeline] Extracting from ${siteConfig.label}...`);
+        const dialogs = await extractor.extract(session.page, siteConfig, modelName);
+        console.log(`[pipeline] ${siteConfig.label}: ${dialogs.length} dialogs extracted`);
+        allDialogs.push(...dialogs);
+      } catch (err) {
+        console.error(`[pipeline] ${siteConfig.label} extraction failed: ${err.message}`);
+      }
     }
+  } finally {
+    await session.close();
   }
-
-  await browser.close();
 
   // 2. Filter already processed
   const processedIds = loadProcessedIds(modelSlug);
