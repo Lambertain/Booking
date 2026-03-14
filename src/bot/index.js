@@ -80,14 +80,14 @@ bot.on('callback_query:data', async (ctx) => {
   const approvalId = idParts.join(':');
 
   if (!currentApproval || currentApproval.approvalId !== approvalId) {
-    await ctx.answerCallbackQuery({ text: 'This item is no longer active' });
+    await ctx.answerCallbackQuery({ text: 'Этот элемент уже не активен' });
     return;
   }
 
   const cb = callbacks.get(approvalId);
 
   if (action === 'approve') {
-    await ctx.answerCallbackQuery({ text: '✅ Approved!' });
+    await ctx.answerCallbackQuery({ text: '✅ Одобрено!' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     if (cb) {
       callbacks.delete(approvalId);
@@ -98,11 +98,11 @@ bot.on('callback_query:data', async (ctx) => {
     sendNextApproval();
   } else if (action === 'edit') {
     editMode.set(approvalId, true);
-    await ctx.answerCallbackQuery({ text: '✏️ Send the corrected text' });
+    await ctx.answerCallbackQuery({ text: '✏️ Отправьте исправленный текст' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
-    await bot.api.sendMessage(CHAT_ID, '✏️ Надішліть виправлений текст відповіді:');
+    await bot.api.sendMessage(CHAT_ID, '✏️ Отправьте исправленный текст ответа:');
   } else if (action === 'skip') {
-    await ctx.answerCallbackQuery({ text: '⏭ Skipped' });
+    await ctx.answerCallbackQuery({ text: '⏭ Пропущено' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     if (cb) {
       callbacks.delete(approvalId);
@@ -131,7 +131,7 @@ bot.on('message:text', async (ctx) => {
     cb.resolve({ action: 'edit', text: editedText, item: cb.item });
   }
 
-  await ctx.reply('✅ Текст прийнято');
+  await ctx.reply('✅ Текст принят');
   currentApproval = null;
   currentMessageId = null;
   sendNextApproval();
