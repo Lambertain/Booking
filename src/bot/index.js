@@ -8,14 +8,11 @@ const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const MODEL_INFO_CARD = `📋 Для добавления модели мне нужны данные:
 
-1️⃣ Имя модели (напр: Katya S)
+1️⃣ Имя модели
 2️⃣ AdsPower Profile ID
 3️⃣ Сайты: model-kartei / adultfolio / modelmayhem
-4️⃣ Adultfolio username (если есть)
-5️⃣ ModelMayhem profile ID (если есть)
-
-Пример:
-Katya S, adspower k456abc, сайты model-kartei и adultfolio, adultfolio username Katya_S`;
+4️⃣ Adultfolio username
+5️⃣ ModelMayhem profile ID`;
 
 // Error handler
 bot.catch((err) => {
@@ -29,6 +26,9 @@ let currentMessageId = null;
 const editMode = new Map();
 const editMedia = new Map();    // approvalId -> [file paths]
 const callbacks = new Map();
+
+// Media buffer for deferred sending
+const mediaBuffer = [];         // [{ localPath, type, timestamp }]
 
 // --- Send approval to chat ---
 
@@ -188,11 +188,12 @@ bot.on('message:text', async (ctx) => {
     await ctx.replyWithChatAction('typing');
     const reply = await agentChat(text);
     if (reply) {
-      // Check for model info request card
       if (reply.includes('REQUEST_MODEL_INFO')) {
         const cleanReply = reply.replace(/REQUEST_MODEL_INFO/g, '').trim();
         if (cleanReply) await ctx.reply(cleanReply);
         await bot.api.sendMessage(CHAT_ID, MODEL_INFO_CARD);
+      } else if (reply.includes('SEND_MEDIA:')) {
+        await processSendMediaCommand(reply, ctx);
       } else {
         await ctx.reply(reply);
       }
@@ -253,20 +254,100 @@ async function handleMedia(ctx, type) {
     return;
   }
 
-  // Outside EDIT mode: media with caption → agent chat
-  const caption = ctx.message.caption || '';
-  if (caption) {
-    try {
-      await ctx.replyWithChatAction('typing');
-      const reply = await agentChat(`[Отправлено ${type === 'photo' ? 'фото' : 'документ'}] ${caption}`);
-      if (reply) await ctx.reply(reply);
-    } catch (err) {
-      console.error('[agent] Media caption chat error:', err.message);
+  // Outside EDIT mode: save to buffer for deferred sending
+  const localPath = await downloadTelegramFile(ctx, type);
+  if (localPath) {
+    mediaBuffer.push({ localPath, type, timestamp: Date.now() });
+    const caption = ctx.message.caption || '';
+    const bufCount = mediaBuffer.length;
+    const msg = caption
+      ? `📎 Файл сохранён (${bufCount} в буфере). ${caption}`
+      : `📎 Файл сохранён (${bufCount} в буфере). Скажите кому отправить или добавьте ещё.`;
+
+    // If there's a caption, also pass to agent
+    if (caption) {
+      try {
+        await ctx.replyWithChatAction('typing');
+        const reply = await agentChat(`[Сохранено ${type === 'photo' ? 'фото' : 'файл'}, ${bufCount} в буфере] ${caption}`);
+        if (reply) {
+          // Check for SEND_MEDIA command
+          if (reply.includes('SEND_MEDIA:')) {
+            await processSendMediaCommand(reply, ctx);
+          } else {
+            await ctx.reply(reply);
+          }
+        }
+      } catch (err) {
+        console.error('[agent] Media chat error:', err.message);
+        await ctx.reply(msg);
+      }
+    } else {
+      await ctx.reply(msg);
     }
-  } else {
-    await ctx.reply(`📎 Получен ${type === 'photo' ? 'снимок' : 'файл'}. Напишите что с ним сделать.`);
   }
 }
+
+async function downloadTelegramFile(ctx, type) {
+  try {
+    let fileId;
+    if (type === 'photo') {
+      const photos = ctx.message.photo;
+      fileId = photos[photos.length - 1].file_id;
+    } else {
+      fileId = ctx.message.document.file_id;
+    }
+
+    const file = await ctx.api.getFile(fileId);
+    const filePath = file.file_path;
+    const downloadUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`;
+
+    const fs = require('fs');
+    const pathMod = require('path');
+    const tmpDir = pathMod.resolve(__dirname, '../../data/tmp');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const ext = pathMod.extname(filePath) || (type === 'photo' ? '.jpg' : '');
+    const localPath = pathMod.join(tmpDir, `media-${Date.now()}${ext}`);
+
+    const res = await fetch(downloadUrl);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(localPath, buffer);
+    return localPath;
+  } catch (err) {
+    console.error('Download file error:', err.message);
+    return null;
+  }
+}
+
+async function processSendMediaCommand(reply, ctx) {
+  const lines = reply.split('\n');
+  const displayLines = [];
+  for (const line of lines) {
+    const match = line.match(/^SEND_MEDIA:([^:]+):([^:]+):(.+)$/);
+    if (match) {
+      const [, photographer, site, message] = match;
+      if (mediaBuffer.length === 0) {
+        displayLines.push('⚠️ Буфер медиа пуст');
+        continue;
+      }
+      const files = mediaBuffer.splice(0, mediaBuffer.length).map(m => m.localPath);
+      // Queue media send
+      pendingMediaSends.push({
+        photographer: photographer.trim(),
+        site: site.trim(),
+        message: message.trim(),
+        files
+      });
+      displayLines.push(`📤 Медиа (${files.length} файлов) будет отправлено ${photographer.trim()} на ${site.trim()}`);
+    } else {
+      displayLines.push(line);
+    }
+  }
+  const text = displayLines.join('\n').trim();
+  if (text) await ctx.reply(text);
+}
+
+// Pending media sends — processed by pipeline when AdsPower opens
+const pendingMediaSends = [];
 
 // --- Bot lifecycle ---
 
@@ -285,4 +366,4 @@ function stopBot() {
   bot.stop();
 }
 
-module.exports = { bot, startBot, stopBot, queueApproval, sendNextApproval };
+module.exports = { bot, startBot, stopBot, queueApproval, sendNextApproval, pendingMediaSends };
