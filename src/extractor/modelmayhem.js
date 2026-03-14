@@ -1,4 +1,4 @@
-const { qualifiesInterest, detectLanguage } = require('./qualify');
+const { detectLanguage } = require('./qualify');
 
 async function collectInboxLinks(page) {
   await page.goto('https://www.modelmayhem.com/mystuff#/inbox', { waitUntil: 'domcontentloaded' });
@@ -49,20 +49,17 @@ async function extract(page, siteConfig, modelName) {
       if (dialog.messages.length === 0) continue;
 
       const lastIncoming = [...dialog.messages].reverse().find(m => m.role === 'interlocutor');
-      const q = qualifiesInterest(dialog.messages, lastIncoming?.text || '');
-      if (!q.qualified) continue;
+      if (!lastIncoming) continue;
 
-      const language = detectLanguage(lastIncoming?.text || '');
       results.push({
         site: 'modelmayhem',
         siteLabel: 'Model Mayhem',
         model: modelName,
         photographer: dialog.photographer || item.photographer,
         url: dialog.url,
-        language,
+        language: detectLanguage(lastIncoming.text),
         messages: dialog.messages,
-        lastIncoming: lastIncoming?.text || '',
-        qualificationReason: q.reason
+        lastIncoming: lastIncoming.text
       });
     } catch (err) {
       console.error(`modelmayhem extract error: ${err.message}`);

@@ -1,4 +1,4 @@
-const { qualifiesInterest, detectLanguage } = require('./qualify');
+const { detectLanguage } = require('./qualify');
 
 function isUiNoise(text) {
   if (!text || !text.trim()) return true;
@@ -25,14 +25,13 @@ async function extractSingleDialog(page, sel, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2000);
 
-  const messages = await page.evaluate(({ rowSel, textSel, selfSel, otherSel }) => {
+  const messages = await page.evaluate(({ rowSel, textSel, selfSel }) => {
     return [...document.querySelectorAll(rowSel)].map(row => {
       const text = (row.querySelector(textSel)?.innerText || '').trim();
       const isSelf = row.matches(selfSel) || row.className.includes('sedcard1');
-      const role = isSelf ? 'self' : 'interlocutor';
-      return { role, text };
+      return { role: isSelf ? 'self' : 'interlocutor', text };
     });
-  }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf, otherSel: sel.messageAuthorOther });
+  }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf });
 
   const photographer = await page.evaluate(() => {
     for (const s of ['.mailContent .username', '.username', 'h1', 'h2']) {
@@ -65,22 +64,18 @@ async function extract(page, siteConfig, modelName) {
         });
 
       if (messages.length === 0) continue;
-
       const lastIncoming = [...messages].reverse().find(m => m.role === 'interlocutor');
-      const q = qualifiesInterest(messages, lastIncoming?.text || '');
-      if (!q.qualified) continue;
+      if (!lastIncoming) continue;
 
-      const language = detectLanguage(lastIncoming?.text || '');
       results.push({
         site: 'model-kartei',
         siteLabel: 'Model-Kartei',
         model: modelName,
         photographer: dialog.photographer,
         url: dialog.url,
-        language,
+        language: detectLanguage(lastIncoming.text),
         messages,
-        lastIncoming: lastIncoming?.text || '',
-        qualificationReason: q.reason
+        lastIncoming: lastIncoming.text
       });
     } catch (err) {
       console.error(`model-kartei extract error for ${url}: ${err.message}`);
