@@ -13,17 +13,14 @@ function formatApprovalCard(item) {
   return lines.join('\n');
 }
 
-function buildApprovalKeyboard(approvalId, url) {
-  const buttons = [];
-  if (url) {
-    buttons.push([{ text: '🔗 OPEN', url }]);
-  }
-  buttons.push([
-    { text: '✅ OK', callback_data: `approve:${approvalId}` },
-    { text: '✏️ EDIT', callback_data: `edit:${approvalId}` },
-    { text: '⏭ SKIP', callback_data: `skip:${approvalId}` }
-  ]);
-  return { inline_keyboard: buttons };
+function buildApprovalKeyboard(approvalId) {
+  return {
+    inline_keyboard: [[
+      { text: '✅ OK', callback_data: `approve:${approvalId}` },
+      { text: '✏️ EDIT', callback_data: `edit:${approvalId}` },
+      { text: '⏭ SKIP', callback_data: `skip:${approvalId}` }
+    ]]
+  };
 }
 
 function escapeMarkdown(text) {

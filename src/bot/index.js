@@ -1,16 +1,21 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
-const { Bot, InlineKeyboard } = require('grammy');
+const { Bot } = require('grammy');
 const { formatApprovalCard, buildApprovalKeyboard } = require('./messages');
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+// Error handler — don't crash on polling errors
+bot.catch((err) => {
+  console.error('Bot error:', err.message || err);
+});
+
 // Approval queue and state
-const approvalQueue = [];         // items waiting to be sent
-let currentApproval = null;       // item currently shown to manager
-let currentMessageId = null;      // telegram message id of current card
-const editMode = new Map();       // approvalId -> true (waiting for edited text)
-const callbacks = new Map();      // approvalId -> { resolve, item }
+const approvalQueue = [];
+let currentApproval = null;
+let currentMessageId = null;
+const editMode = new Map();
+const callbacks = new Map();
 
 // --- Send approval to chat ---
 
@@ -22,7 +27,7 @@ async function sendNextApproval() {
   currentApproval = item;
 
   const text = formatApprovalCard(item);
-  const keyboard = buildApprovalKeyboard(item.approvalId, item.url);
+  const keyboard = buildApprovalKeyboard(item.approvalId);
 
   try {
     const msg = await bot.api.sendMessage(CHAT_ID, text, {
@@ -31,15 +36,26 @@ async function sendNextApproval() {
     });
     currentMessageId = msg.message_id;
   } catch (err) {
-    console.error('Failed to send approval card:', err.message);
-    // Try plain text fallback
+    console.error('MarkdownV2 failed, trying plain text:', err.message);
     try {
-      const plain = `📸 ${item.photographer} | ${item.siteLabel} | ${item.model}\n\nINCOMING:\n${item.lastIncoming}\n\nDRAFT:\n${item.draft}`;
-      const keyboard = buildApprovalKeyboard(item.approvalId, item.url);
+      const plain = [
+        `📸 ${item.photographer} | ${item.siteLabel} | ${item.model}`,
+        '',
+        `💬 INCOMING:`,
+        item.lastIncoming || '(empty)',
+        '',
+        `✏️ DRAFT:`,
+        item.draft || '(no draft)',
+      ].join('\n');
       const msg = await bot.api.sendMessage(CHAT_ID, plain, { reply_markup: keyboard });
       currentMessageId = msg.message_id;
     } catch (err2) {
-      console.error('Failed plain text fallback:', err2.message);
+      console.error('Plain text also failed:', err2.message);
+      const cb = callbacks.get(item.approvalId);
+      if (cb) {
+        callbacks.delete(item.approvalId);
+        cb.resolve({ action: 'skip', text: null, item: cb.item });
+      }
       currentApproval = null;
       sendNextApproval();
     }
@@ -125,8 +141,13 @@ bot.on('message:text', async (ctx) => {
 
 async function startBot() {
   console.log('Telegram bot starting...');
+  // Drop pending updates to avoid conflicts
+  await bot.api.deleteWebhook({ drop_pending_updates: true });
+  await new Promise(r => setTimeout(r, 1000));
+
   bot.start({
     onStart: () => console.log('Telegram bot started'),
+    drop_pending_updates: true,
   });
 }
 
