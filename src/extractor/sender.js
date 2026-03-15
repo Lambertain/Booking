@@ -48,10 +48,38 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
   }
 }
 
+async function sendModelMayhemReply(profileId, siteConfig, url, message) {
+  const session = await openPage(profileId);
+  const { page } = session;
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(5000);
+
+    // Fill reply textarea
+    const textarea = page.locator('textarea#AreaReplyMessage');
+    if (await textarea.count() === 0) throw new Error('Reply textarea not found');
+    await textarea.fill(message);
+    await page.waitForTimeout(500);
+
+    // Click Reply button
+    const replyBtn = page.locator('input[type="submit"][value="Reply"]');
+    if (await replyBtn.count() === 0) throw new Error('Reply button not found');
+    await replyBtn.click();
+    await page.waitForTimeout(5000);
+
+    return { ok: true, url };
+  } finally {
+    await session.close();
+  }
+}
+
 async function sendReply(profileId, siteConfig, url, message, mediaFiles = []) {
   const siteId = siteConfig.id;
   if (siteId === 'adultfolio') {
     return sendAdultfolioReply(profileId, siteConfig, url, message, mediaFiles);
+  }
+  if (siteId === 'modelmayhem') {
+    return sendModelMayhemReply(profileId, siteConfig, url, message);
   }
   throw new Error(`Sending not yet implemented for site: ${siteId}`);
 }
