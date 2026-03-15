@@ -73,6 +73,29 @@ async function sendModelMayhemReply(profileId, siteConfig, url, message) {
   }
 }
 
+async function sendModelKarteiReply(profileId, siteConfig, url, message) {
+  const session = await openPage(profileId);
+  const { page } = session;
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4000);
+
+    const textarea = page.locator('textarea#pnTextpost');
+    if (await textarea.count() === 0) throw new Error('Reply textarea not found');
+    await textarea.fill(message);
+    await page.waitForTimeout(500);
+
+    const sendBtn = page.locator('form#pnSendForm button[type="submit"]');
+    if (await sendBtn.count() === 0) throw new Error('Send button not found');
+    await sendBtn.click();
+    await page.waitForTimeout(5000);
+
+    return { ok: true, url };
+  } finally {
+    await session.close();
+  }
+}
+
 async function sendReply(profileId, siteConfig, url, message, mediaFiles = []) {
   const siteId = siteConfig.id;
   if (siteId === 'adultfolio') {
@@ -80,6 +103,9 @@ async function sendReply(profileId, siteConfig, url, message, mediaFiles = []) {
   }
   if (siteId === 'modelmayhem') {
     return sendModelMayhemReply(profileId, siteConfig, url, message);
+  }
+  if (siteId === 'model-kartei') {
+    return sendModelKarteiReply(profileId, siteConfig, url, message);
   }
   throw new Error(`Sending not yet implemented for site: ${siteId}`);
 }
