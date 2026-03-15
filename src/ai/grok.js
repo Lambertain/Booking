@@ -17,18 +17,50 @@ function loadProfile(modelDir) {
     .join('\n\n---\n\n');
 }
 
-function loadTrainingExamples(modelSlug) {
+function loadAllEntries(modelSlug) {
   const logPath = path.join(DATA_DIR, modelSlug || '', 'training', 'approved-responses.jsonl');
-  if (!fs.existsSync(logPath)) return '';
+  if (!fs.existsSync(logPath)) return [];
   try {
-    const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean);
-    if (lines.length === 0) return '';
-    const entries = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-    const examples = entries.filter(e => e.action === 'edit').slice(-MAX_EXAMPLES);
-    if (examples.length === 0) return '';
-    return '\n\nAPPROVED RESPONSE EXAMPLES (learn from manager corrections):\n' +
-      examples.map((e, i) => `Example ${i + 1}:\nPhotographer: ${e.lastIncoming}\nApproved reply: ${e.finalText}`).join('\n\n');
-  } catch { return ''; }
+    return fs.readFileSync(logPath, 'utf8').trim().split('\n')
+      .filter(Boolean)
+      .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+  } catch { return []; }
+}
+
+function loadTrainingExamples(modelSlug) {
+  const entries = loadAllEntries(modelSlug);
+  const examples = entries.filter(e => e.action === 'edit').slice(-MAX_EXAMPLES);
+  if (examples.length === 0) return '';
+  return '\n\nMANAGER CORRECTIONS (learn from these):\n' +
+    examples.map((e, i) => `Example ${i + 1}:\nPhotographer: ${e.lastIncoming}\nCorrected reply: ${e.finalText}`).join('\n\n');
+}
+
+function findCachedResponse(modelSlug, photographerMessage) {
+  const entries = loadAllEntries(modelSlug);
+  if (entries.length === 0) return null;
+
+  const normalized = photographerMessage.toLowerCase().trim().replace(/[?!.,]+/g, '');
+
+  for (const e of entries.reverse()) {
+    if (e.action !== 'approve' && e.action !== 'edit') continue;
+    const entryNorm = (e.lastIncoming || '').toLowerCase().trim().replace(/[?!.,]+/g, '');
+    if (!entryNorm) continue;
+
+    // Exact match on non-booking-specific questions (rates, availability general)
+    if (entryNorm === normalized) return { text: e.finalText, exact: true };
+
+    // Same type of question — use as style template
+    const rateQ = /rate|price|honorar|kosten|fee|budget/i;
+    const schedQ = /date|time|when|available|duration/i;
+    if (rateQ.test(normalized) && rateQ.test(entryNorm)) {
+      return { template: e.finalText, exact: false };
+    }
+    if (schedQ.test(normalized) && schedQ.test(entryNorm)) {
+      return { template: e.finalText, exact: false };
+    }
+  }
+  return null;
 }
 
 function buildSystemPrompt(profile, modelName) {
@@ -69,9 +101,20 @@ async function generateDraft(modelDir, modelName, messages, lastIncoming, photog
 
   const profile = loadProfile(modelDir);
   const modelSlug = path.basename(modelDir);
+
+  // Check cache — exact non-date match can be reused
+  const cached = findCachedResponse(modelSlug, lastIncoming);
+  if (cached?.exact) {
+    console.log('[grok] Cache hit:', lastIncoming.slice(0, 50));
+    return cached.text;
+  }
+
   const trainingExamples = loadTrainingExamples(modelSlug);
+  const styleHint = cached?.template
+    ? `\n\nSTYLE TEMPLATE (manager previously replied to similar question like this):\n${cached.template}\nFollow this style but adapt to current context.`
+    : '';
   const systemPrompt = buildSystemPrompt(profile, modelName) + trainingExamples;
-  const userPrompt = buildUserPrompt(messages, lastIncoming, photographer, language);
+  const userPrompt = buildUserPrompt(messages, lastIncoming, photographer, language) + styleHint;
 
   const res = await fetch(API_URL, {
     method: 'POST',
