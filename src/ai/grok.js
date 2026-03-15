@@ -3,6 +3,8 @@ const path = require('path');
 
 const API_URL = 'https://api.x.ai/v1/chat/completions';
 const MODEL = 'grok-3-mini-fast';
+const DATA_DIR = path.resolve(__dirname, '../../data');
+const MAX_EXAMPLES = 10;
 
 function loadProfile(modelDir) {
   const files = ['reply-engine.md', 'rules.md', 'style.md', 'templates.md'];
@@ -13,6 +15,22 @@ function loadProfile(modelDir) {
     })
     .filter(Boolean)
     .join('\n\n---\n\n');
+}
+
+function loadTrainingExamples(modelSlug) {
+  const logPath = path.join(DATA_DIR, modelSlug || '', 'training', 'approved-responses.jsonl');
+  if (!fs.existsSync(logPath)) return '';
+  try {
+    const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean);
+    if (lines.length === 0) return '';
+    const entries = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const edited = entries.filter(e => e.action === 'edit');
+    const approved = entries.filter(e => e.action === 'approve');
+    const examples = [...edited.slice(-MAX_EXAMPLES), ...approved.slice(-(MAX_EXAMPLES - edited.length))].slice(-MAX_EXAMPLES);
+    if (examples.length === 0) return '';
+    return '\n\nAPPROVED RESPONSE EXAMPLES (learn from manager corrections):\n' +
+      examples.map((e, i) => `Example ${i + 1}:\nPhotographer: ${e.lastIncoming}\nApproved reply: ${e.finalText}`).join('\n\n');
+  } catch { return ''; }
 }
 
 function buildSystemPrompt(profile, modelName) {
@@ -28,7 +46,9 @@ IMPORTANT RULES:
 - If booking details are missing, ask for: date, time, duration, shooting level, location
 - Do NOT invent availability, rates, or promises
 - Sign off with "Best regards, ${modelName.split(' ')[0]}" or equivalent in their language
-- Output ONLY the reply text, nothing else`;
+- Output ONLY the reply text, nothing else
+
+`;
 }
 
 function buildUserPrompt(messages, lastIncoming, photographer, language) {
@@ -50,7 +70,9 @@ async function generateDraft(modelDir, modelName, messages, lastIncoming, photog
   if (!apiKey) throw new Error('Missing XAI_API_KEY env');
 
   const profile = loadProfile(modelDir);
-  const systemPrompt = buildSystemPrompt(profile, modelName);
+  const modelSlug = path.basename(modelDir);
+  const trainingExamples = loadTrainingExamples(modelSlug);
+  const systemPrompt = buildSystemPrompt(profile, modelName) + trainingExamples;
   const userPrompt = buildUserPrompt(messages, lastIncoming, photographer, language);
 
   const res = await fetch(API_URL, {
