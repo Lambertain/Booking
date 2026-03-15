@@ -14,9 +14,14 @@ const MODEL_INFO_CARD = `📋 Для добавления модели мне н
 4️⃣ Adultfolio username
 5️⃣ ModelMayhem profile ID`;
 
-// Error handler
+// Error handler — don't crash on polling errors
 bot.catch((err) => {
-  console.error('Bot error:', err.message || err);
+  const msg = err?.error?.message || err?.message || String(err);
+  if (msg.includes('409') || msg.includes('Conflict')) {
+    console.error('Bot polling conflict (another instance?), will retry...');
+    return;
+  }
+  console.error('Bot error:', msg);
 });
 
 // Approval queue and state
@@ -354,12 +359,24 @@ const pendingMediaSends = [];
 async function startBot() {
   console.log('Telegram bot starting...');
   await bot.api.deleteWebhook({ drop_pending_updates: true });
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 2000));
 
-  bot.start({
-    onStart: () => console.log('Telegram bot started'),
-    drop_pending_updates: true,
-  });
+  // Start with retry on conflict
+  const startPolling = () => {
+    bot.start({
+      onStart: () => console.log('Telegram bot started'),
+      drop_pending_updates: true,
+    }).catch(err => {
+      const msg = err?.message || String(err);
+      if (msg.includes('409') || msg.includes('Conflict')) {
+        console.log('Bot polling conflict, retrying in 5s...');
+        setTimeout(startPolling, 5000);
+      } else {
+        console.error('Bot start error:', msg);
+      }
+    });
+  };
+  startPolling();
 }
 
 function stopBot() {
