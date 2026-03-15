@@ -7,26 +7,28 @@ const MODELS_DIR = path.resolve(__dirname, '../../models');
 
 function getModelSlugs() {
   return fs.readdirSync(MODELS_DIR)
-    .filter(f => {
-      const configPath = path.join(MODELS_DIR, f, 'config.json');
-      return fs.existsSync(configPath);
-    });
+    .filter(f => fs.existsSync(path.join(MODELS_DIR, f, 'config.json')));
+}
+
+function isWorkingHours() {
+  // Kyiv = UTC+2 (winter) / UTC+3 (summer)
+  const now = new Date();
+  const kyivHour = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Kyiv' })).getHours();
+  return kyivHour >= 8 && kyivHour < 22;
 }
 
 let currentModelIndex = 0;
 let isRunning = false;
 
 async function runNext() {
-  if (isRunning) {
-    console.log('[scheduler] Previous scan still running, skipping');
+  if (isRunning) return;
+  if (!isWorkingHours()) {
+    console.log('[scheduler] Outside working hours (8:00-22:00 Kyiv), skipping');
     return;
   }
 
   const models = getModelSlugs();
-  if (models.length === 0) {
-    console.log('[scheduler] No models configured');
-    return;
-  }
+  if (models.length === 0) return;
 
   const modelSlug = models[currentModelIndex % models.length];
   currentModelIndex = (currentModelIndex + 1) % models.length;
@@ -43,13 +45,11 @@ async function runNext() {
 
 function startScheduler() {
   const intervalMin = parseInt(process.env.SCAN_INTERVAL_MIN || '15', 10);
-  console.log(`[scheduler] Scanning every ${intervalMin} minutes`);
+  console.log(`[scheduler] Scanning every ${intervalMin} min, 8:00-22:00 Kyiv`);
   console.log(`[scheduler] Models: ${getModelSlugs().join(', ')}`);
 
-  // Run immediately on start
-  runNext();
+  if (isWorkingHours()) runNext();
 
-  // Then on schedule
   cron.schedule(`*/${intervalMin} * * * *`, runNext);
 }
 
