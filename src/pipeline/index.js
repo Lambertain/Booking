@@ -5,7 +5,7 @@ const modelKartei = require('../extractor/model-kartei');
 const adultfolio = require('../extractor/adultfolio');
 const modelmayhem = require('../extractor/modelmayhem');
 const { generateDraft, qualifyDialog, classifyDraft, extractShootDetails } = require('../ai/grok');
-const { queueApproval } = require('../bot/index');
+const { addToQueue } = require('./queue');
 const { sendReply } = require('../extractor/sender');
 const { recordShoot } = require('../airtable/index');
 
@@ -174,39 +174,13 @@ async function runPipelineForModel(modelSlug) {
       const draftType = await classifyDraft(modelDir, draft, item.messages, item.photographer);
       item.draftType = draftType;
 
-      // Determine if approval is needed
-      const needsApproval = TRAINING_MODE ||
-        draftType === 'custom' ||
-        mentionsDateTime(draft);
-
-      if (needsApproval) {
-        const reason = TRAINING_MODE ? 'training mode' :
-          mentionsDateTime(draft) ? 'mentions date/time' : 'custom response';
-        console.log(`[pipeline] 🔔 ${item.photographer} → approval (${reason})`);
-
-        const result = await queueApproval(item);
-
-        if (result.action === 'approve' || result.action === 'edit') {
-          const finalText = result.action === 'edit' ? result.text : (result.text || draft);
-          await trySendReply(config, item, finalText);
-          logApprovedResponse(modelSlug, item, finalText, result.action);
-          await tryRecordShoot(item);
-          console.log(`[pipeline] ${result.action === 'approve' ? '✅' : '✏️'} ${item.photographer}: reply sent`);
-        } else {
-          console.log(`[pipeline] ⏭ Skipped: ${item.photographer}`);
-        }
+      // Add to approval queue (bot will process one at a time)
+      item.modelSlug = modelSlug;
+      const added = addToQueue(item);
+      if (added) {
+        console.log(`[pipeline] 📋 Queued: ${item.photographer} (${item.siteLabel}) — ${item.draftType}`);
       } else {
-        // Auto-send (only when TRAINING_MODE is false)
-        console.log(`[pipeline] 📤 Auto-sending to ${item.photographer}`);
-        await trySendReply(config, item, draft);
-        logApprovedResponse(modelSlug, item, draft, 'auto');
-        await tryRecordShoot(item);
-        try {
-          const { bot } = require('../bot/index');
-          await bot.api.sendMessage(process.env.TELEGRAM_CHAT_ID,
-            `📤 Auto-sent to ${item.photographer} (${item.siteLabel}):\n\n${draft}`
-          );
-        } catch {}
+        console.log(`[pipeline] Already in queue: ${item.photographer}`);
       }
 
       processedIds.add(makeDialogId(item));
