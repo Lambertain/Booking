@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const { runPipelineForModel } = require('../pipeline/index');
+const { takeSendNext, sendQueueLength } = require('../pipeline/send-queue');
+const { sendReply } = require('../extractor/sender');
+const { openPage } = require('../extractor/adspower');
 
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 
@@ -11,7 +14,6 @@ function getModelSlugs() {
 }
 
 function isWorkingHours() {
-  // Kyiv = UTC+2 (winter) / UTC+3 (summer)
   const now = new Date();
   const kyivHour = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Kyiv' })).getHours();
   return kyivHour >= 8 && kyivHour < 22;
@@ -20,24 +22,46 @@ function isWorkingHours() {
 let currentModelIndex = 0;
 let isRunning = false;
 
+async function processSendQueue() {
+  while (sendQueueLength() > 0) {
+    const toSend = takeSendNext();
+    if (!toSend) break;
+
+    try {
+      const configPath = path.join(MODELS_DIR, toSend.modelSlug, 'config.json');
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const siteConfig = config.sites.find(s => s.id === toSend.site);
+      if (siteConfig) {
+        await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text);
+        console.log(`[scheduler] ✅ Sent reply to ${toSend.photographer} on ${toSend.site}`);
+      }
+    } catch (err) {
+      console.error(`[scheduler] Send failed for ${toSend.photographer}: ${err.message}`);
+    }
+  }
+}
+
 async function runNext() {
   if (isRunning) return;
-  if (!isWorkingHours()) {
-    console.log('[scheduler] Outside working hours (8:00-22:00 Kyiv), skipping');
-    return;
-  }
-
-  const models = getModelSlugs();
-  if (models.length === 0) return;
-
-  const modelSlug = models[currentModelIndex % models.length];
-  currentModelIndex = (currentModelIndex + 1) % models.length;
 
   isRunning = true;
   try {
+    // Always process send queue, even outside working hours
+    await processSendQueue();
+
+    if (!isWorkingHours()) {
+      return;
+    }
+
+    const models = getModelSlugs();
+    if (models.length === 0) return;
+
+    const modelSlug = models[currentModelIndex % models.length];
+    currentModelIndex = (currentModelIndex + 1) % models.length;
+
     await runPipelineForModel(modelSlug);
   } catch (err) {
-    console.error(`[scheduler] Pipeline failed for ${modelSlug}: ${err.message}`);
+    console.error(`[scheduler] Error: ${err.message}`);
   } finally {
     isRunning = false;
   }
@@ -48,8 +72,7 @@ function startScheduler() {
   console.log(`[scheduler] Scanning every ${intervalMin} min, 8:00-22:00 Kyiv`);
   console.log(`[scheduler] Models: ${getModelSlugs().join(', ')}`);
 
-  if (isWorkingHours()) runNext();
-
+  runNext();
   cron.schedule(`*/${intervalMin} * * * *`, runNext);
 }
 

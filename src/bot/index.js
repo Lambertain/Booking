@@ -5,7 +5,7 @@ const { Bot } = require('grammy');
 const { formatApprovalCard, buildApprovalKeyboard, collectPhotographerImages } = require('./messages');
 const { chat: agentChat } = require('../ai/agent');
 const { takeNext, queueLength } = require('../pipeline/queue');
-const { sendReply } = require('../extractor/sender');
+const { addToSendQueue } = require('../pipeline/send-queue');
 const { recordShoot } = require('../airtable/index');
 const { extractShootDetails } = require('../ai/grok');
 
@@ -73,17 +73,15 @@ async function handleApprovalResult(action, text) {
   if (action === 'approve' || action === 'edit') {
     const finalText = action === 'edit' ? text : item.draft;
 
-    // Send reply to photographer
-    try {
-      const config = JSON.parse(fs.readFileSync(path.join(MODELS_DIR, modelSlug, 'config.json'), 'utf8'));
-      const siteConfig = config.sites.find(s => s.id === item.site);
-      if (siteConfig) {
-        await sendReply(config.adspower.profileId, siteConfig, item.url, finalText);
-        console.log(`[bot] Reply sent to ${item.photographer}`);
-      }
-    } catch (err) {
-      console.error(`[bot] Send reply failed: ${err.message}`);
-    }
+    // Queue for sending via scheduler's browser session
+    addToSendQueue({
+      modelSlug,
+      site: item.site,
+      photographer: item.photographer,
+      url: item.url,
+      text: finalText
+    });
+    console.log(`[bot] Queued reply for ${item.photographer}`);
 
     // Log for training
     const logDir = path.join(DATA_DIR, modelSlug, 'training');
