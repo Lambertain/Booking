@@ -140,16 +140,24 @@ async function runPipelineForModel(modelSlug) {
     await session.close();
   }
 
-  // 2. Filter: new dialogs OR dialogs with new messages from photographer
+  // 2. Filter: only dialogs where last message is from photographer (not us)
+  //    AND either never seen or photographer sent new messages
   const processed = loadProcessed(modelSlug);
   const newItems = allDialogs.filter(item => {
+    const msgs = item.messages || [];
+    if (msgs.length === 0) return false;
+
+    // Skip if last message is ours — we already replied
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg.role === 'self') return false;
+
     const id = makeDialogId(item);
     const prev = processed[id];
     if (!prev) return true; // never seen
 
-    // Check if photographer sent new messages
+    // Check if photographer sent new messages since we last processed
     const lastIncoming = item.lastIncoming || '';
-    const msgCount = (item.messages || []).filter(m => m.role === 'interlocutor').length;
+    const msgCount = msgs.filter(m => m.role === 'interlocutor').length;
 
     if (lastIncoming !== prev.lastIncoming || msgCount > prev.msgCount) {
       console.log(`[pipeline] 🔄 Нове повідомлення від ${item.photographer}: "${lastIncoming.slice(0, 60)}"`);
