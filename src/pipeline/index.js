@@ -92,6 +92,41 @@ function makeDialogId(item) {
   return `${item.site}::${item.photographer}::${item.url}`;
 }
 
+// Active dialogs — we replied, waiting for photographer's response
+function getActiveDialogsPath(modelSlug) {
+  const dir = path.join(getDataDir(modelSlug), 'processed');
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'active-dialogs.json');
+}
+
+function loadActiveDialogs(modelSlug) {
+  const fp = getActiveDialogsPath(modelSlug);
+  if (!fs.existsSync(fp)) return [];
+  try { return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch { return []; }
+}
+
+function saveActiveDialogs(modelSlug, dialogs) {
+  fs.writeFileSync(getActiveDialogsPath(modelSlug), JSON.stringify(dialogs, null, 2), 'utf8');
+}
+
+function addActiveDialog(modelSlug, item) {
+  const dialogs = loadActiveDialogs(modelSlug);
+  if (dialogs.some(d => d.url === item.url)) return;
+  dialogs.push({
+    site: item.site,
+    siteLabel: item.siteLabel,
+    photographer: item.photographer,
+    url: item.url,
+    addedAt: new Date().toISOString()
+  });
+  saveActiveDialogs(modelSlug, dialogs);
+}
+
+function removeActiveDialog(modelSlug, url) {
+  const dialogs = loadActiveDialogs(modelSlug);
+  saveActiveDialogs(modelSlug, dialogs.filter(d => d.url !== url));
+}
+
 // Date/time mentions in draft = always needs approval (model needs to plan travel)
 function mentionsDateTime(text) {
   return /\b\d{1,2}[./-]\d{1,2}([./-]\d{2,4})?\b/.test(text) ||
@@ -101,6 +136,85 @@ function mentionsDateTime(text) {
     /\b\d{1,2}:\d{2}\b/.test(text) ||
     /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(text) ||
     /\b(januar|februar|mä?rz|april|mai|juni|juli|august|september|oktober|november|dezember)\b/i.test(text);
+}
+
+const { detectLanguage } = require('../extractor/qualify');
+
+async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
+  await page.goto(active.url, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000);
+
+  if (active.site === 'model-kartei') {
+    const sel = siteConfig.selectors;
+    const messages = await page.evaluate(({ rowSel, textSel, selfSel }) => {
+      return [...document.querySelectorAll(rowSel)].map(row => {
+        const text = (row.querySelector(textSel)?.innerText || '').trim();
+        const isSelf = row.matches(selfSel) || row.className.includes('sedcard1');
+        return { role: isSelf ? 'self' : 'interlocutor', text };
+      }).filter(m => m.text);
+    }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf });
+
+    if (messages.length === 0) return null;
+    const lastIncoming = [...messages].reverse().find(m => m.role === 'interlocutor');
+    if (!lastIncoming) return null;
+
+    return {
+      site: 'model-kartei', siteLabel: 'Model-Kartei', model: modelName,
+      photographer: active.photographer, url: active.url,
+      language: detectLanguage(lastIncoming.text), messages, lastIncoming: lastIncoming.text
+    };
+  }
+
+  if (active.site === 'adultfolio') {
+    const selfPattern = siteConfig.selfProfilePattern || 'Ana_Voloshina';
+    const dialog = await page.evaluate((selfPat) => {
+      const messages = [...document.querySelectorAll('.messageContainer')].map(el => {
+        const profileHref = el.querySelector('.thumbnailPic')?.getAttribute('href') || '';
+        const role = new RegExp(selfPat, 'i').test(profileHref) ? 'self' : 'interlocutor';
+        const text = (el.querySelector('[id^="message-content-"]')?.innerText || '').trim();
+        return { role, text };
+      }).filter(m => m.text);
+      return { url: location.href, messages };
+    }, selfPattern);
+
+    if (dialog.messages.length === 0) return null;
+    const lastIncoming = [...dialog.messages].reverse().find(m => m.role === 'interlocutor');
+    if (!lastIncoming) return null;
+
+    return {
+      site: 'adultfolio', siteLabel: 'adultfolio.com', model: modelName,
+      photographer: active.photographer, url: active.url,
+      language: detectLanguage(lastIncoming.text), messages: dialog.messages, lastIncoming: lastIncoming.text
+    };
+  }
+
+  if (active.site === 'modelmayhem') {
+    const selfProfileId = siteConfig.selfProfileId || '';
+    const dialog = await page.evaluate(({ selfProfileId, selfName }) => {
+      const senderBoxes = [...document.querySelectorAll('.SenderBox')];
+      const textNodes = [...document.querySelectorAll('.MessagesSection .text')];
+      const messages = senderBoxes.map((sb, i) => {
+        const link = sb.querySelector('a[href^="/"]')?.getAttribute('href') || '';
+        const name = (sb.innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+        const text = (textNodes[i]?.innerText || '').trim();
+        const isSelf = link.includes('/' + selfProfileId) || name.toLowerCase() === selfName.toLowerCase();
+        return { role: isSelf ? 'self' : 'interlocutor', text };
+      }).filter(m => m.text);
+      return { url: location.href, messages };
+    }, { selfProfileId, selfName: modelName });
+
+    if (dialog.messages.length === 0) return null;
+    const lastIncoming = [...dialog.messages].reverse().find(m => m.role === 'interlocutor');
+    if (!lastIncoming) return null;
+
+    return {
+      site: 'modelmayhem', siteLabel: 'Model Mayhem', model: modelName,
+      photographer: active.photographer, url: active.url,
+      language: detectLanguage(lastIncoming.text), messages: dialog.messages, lastIncoming: lastIncoming.text
+    };
+  }
+
+  return null;
 }
 
 async function runPipelineForModel(modelSlug) {
@@ -123,6 +237,7 @@ async function runPipelineForModel(modelSlug) {
   const allDialogs = [];
 
   try {
+    // Extract from inbox (recent dialogs)
     for (const siteConfig of config.sites) {
       const extractor = extractors[siteConfig.id];
       if (!extractor) continue;
@@ -134,6 +249,27 @@ async function runPipelineForModel(modelSlug) {
         allDialogs.push(...dialogs);
       } catch (err) {
         console.error(`[pipeline] ${siteConfig.label} extraction failed: ${err.message}`);
+      }
+    }
+
+    // Also check active dialogs (qualified ones we replied to, may be in offtop)
+    const activeDialogs = loadActiveDialogs(modelSlug);
+    const existingUrls = new Set(allDialogs.map(d => d.url));
+
+    for (const active of activeDialogs) {
+      if (existingUrls.has(active.url)) continue; // already in inbox results
+
+      const siteConfig = config.sites.find(s => s.id === active.site);
+      const extractor = extractors[active.site];
+      if (!siteConfig || !extractor) continue;
+
+      try {
+        // Extract single dialog by URL
+        console.log(`[pipeline] 🔍 Перевіряю активний діалог: ${active.photographer} (${active.siteLabel})`);
+        const dialog = await extractSingleDialogByUrl(session.page, active, siteConfig, modelName);
+        if (dialog) allDialogs.push(dialog);
+      } catch (err) {
+        console.error(`[pipeline] Active dialog check failed for ${active.photographer}: ${err.message}`);
       }
     }
   } finally {
@@ -183,6 +319,8 @@ async function runPipelineForModel(modelSlug) {
 
       if (!q.qualified) {
         console.log(`[pipeline] ❌ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
+        // Remove from active — photographer refused or lost interest
+        removeActiveDialog(modelSlug, item.url);
         processed[makeDialogId(item)] = {
           msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
           lastIncoming: item.lastIncoming || '',
@@ -211,6 +349,8 @@ async function runPipelineForModel(modelSlug) {
       const added = addToQueue(item);
       if (added) {
         console.log(`[pipeline] 📋 Queued: ${item.photographer} (${item.siteLabel}) — ${item.draftType}`);
+        // Track as active dialog — check every scan until resolved
+        addActiveDialog(modelSlug, item);
       } else {
         console.log(`[pipeline] Already in queue: ${item.photographer}`);
       }
