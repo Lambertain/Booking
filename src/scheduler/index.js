@@ -22,7 +22,18 @@ function isWorkingHours() {
 let currentModelIndex = 0;
 let isRunning = false;
 
+let sendPaused = false;
+
+async function notifyTelegram(text) {
+  try {
+    const { bot } = require('../bot/index');
+    await bot.api.sendMessage(process.env.TELEGRAM_CHAT_ID, text);
+  } catch {}
+}
+
 async function processSendQueue() {
+  if (sendPaused) return;
+
   while (sendQueueLength() > 0) {
     const toSend = takeSendNext();
     if (!toSend) break;
@@ -31,12 +42,19 @@ async function processSendQueue() {
       const configPath = path.join(MODELS_DIR, toSend.modelSlug, 'config.json');
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       const siteConfig = config.sites.find(s => s.id === toSend.site);
-      if (siteConfig) {
-        await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text);
-        console.log(`[scheduler] ✅ Sent reply to ${toSend.photographer} on ${toSend.site}`);
-      }
+      if (!siteConfig) throw new Error(`Site config not found: ${toSend.site}`);
+
+      await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text);
+      console.log(`[scheduler] ✅ Sent reply to ${toSend.photographer} on ${toSend.site}`);
+      await notifyTelegram(`✅ Відповідь доставлена: ${toSend.photographer} (${toSend.site})`);
     } catch (err) {
       console.error(`[scheduler] Send failed for ${toSend.photographer}: ${err.message}`);
+      // Put back in queue and pause
+      const { addToSendQueue } = require('../pipeline/send-queue');
+      addToSendQueue(toSend);
+      sendPaused = true;
+      await notifyTelegram(`❌ Не вдалося доставити: ${toSend.photographer} (${toSend.site})\nПомилка: ${err.message}\n\nВідправка призупинена. Напишіть "resume" щоб відновити.`);
+      break;
     }
   }
 }
@@ -76,4 +94,9 @@ function startScheduler() {
   cron.schedule(`*/${intervalMin} * * * *`, runNext);
 }
 
-module.exports = { startScheduler, runNext };
+function resumeSending() {
+  sendPaused = false;
+  console.log('[scheduler] Sending resumed');
+}
+
+module.exports = { startScheduler, runNext, resumeSending };
