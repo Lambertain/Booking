@@ -43,18 +43,24 @@ function getProcessedPath(modelSlug) {
   return path.join(dir, 'processed-ids.json');
 }
 
-function loadProcessedIds(modelSlug) {
+// processedIds: { dialogId: { msgCount, lastIncoming, timestamp } }
+function loadProcessed(modelSlug) {
   const fp = getProcessedPath(modelSlug);
-  if (!fs.existsSync(fp)) return new Set();
+  if (!fs.existsSync(fp)) return {};
   try {
-    return new Set(JSON.parse(fs.readFileSync(fp, 'utf8')));
-  } catch {
-    return new Set();
-  }
+    const data = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    // Migration: old format was array of strings
+    if (Array.isArray(data)) {
+      const obj = {};
+      for (const id of data) obj[id] = { msgCount: 0, lastIncoming: '', timestamp: new Date().toISOString() };
+      return obj;
+    }
+    return data;
+  } catch { return {}; }
 }
 
-function saveProcessedIds(modelSlug, ids) {
-  fs.writeFileSync(getProcessedPath(modelSlug), JSON.stringify([...ids], null, 2), 'utf8');
+function saveProcessed(modelSlug, processed) {
+  fs.writeFileSync(getProcessedPath(modelSlug), JSON.stringify(processed, null, 2), 'utf8');
 }
 
 // Approved responses log — builds training data
@@ -134,16 +140,30 @@ async function runPipelineForModel(modelSlug) {
     await session.close();
   }
 
-  // 2. Filter already processed
-  const processedIds = loadProcessedIds(modelSlug);
-  const newItems = allDialogs.filter(item => !processedIds.has(makeDialogId(item)));
+  // 2. Filter: new dialogs OR dialogs with new messages from photographer
+  const processed = loadProcessed(modelSlug);
+  const newItems = allDialogs.filter(item => {
+    const id = makeDialogId(item);
+    const prev = processed[id];
+    if (!prev) return true; // never seen
+
+    // Check if photographer sent new messages
+    const lastIncoming = item.lastIncoming || '';
+    const msgCount = (item.messages || []).filter(m => m.role === 'interlocutor').length;
+
+    if (lastIncoming !== prev.lastIncoming || msgCount > prev.msgCount) {
+      console.log(`[pipeline] 🔄 Нове повідомлення від ${item.photographer}: "${lastIncoming.slice(0, 60)}"`);
+      return true;
+    }
+    return false;
+  });
 
   if (newItems.length === 0) {
-    console.log(`[pipeline] No new dialogs for ${modelName}`);
+    console.log(`[pipeline] Немає нових діалогів для ${modelName}`);
     return;
   }
 
-  console.log(`[pipeline] ${newItems.length} new dialogs to qualify for ${modelName}`);
+  console.log(`[pipeline] ${newItems.length} діалогів для обробки (${modelName})`);
 
   // 3. Qualify → draft → approve/send
   for (const item of newItems) {
@@ -155,8 +175,12 @@ async function runPipelineForModel(modelSlug) {
 
       if (!q.qualified) {
         console.log(`[pipeline] ❌ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
-        processedIds.add(makeDialogId(item));
-        saveProcessedIds(modelSlug, processedIds);
+        processed[makeDialogId(item)] = {
+          msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
+          lastIncoming: item.lastIncoming || '',
+          timestamp: new Date().toISOString()
+        };
+        saveProcessed(modelSlug, processed);
         continue;
       }
 
