@@ -42,14 +42,29 @@ async function openPage(profileId) {
   const page = context.pages()[0] || await context.newPage();
 
   async function close() {
-    // Close extra tabs, keep only first one
+    // Keep one tab per site, close the rest
     try {
       const pages = context.pages();
-      for (let i = pages.length - 1; i > 0; i--) {
-        try { await pages[i].close(); } catch {}
+      const siteUrls = new Set();
+      const toKeep = [];
+      const toClose = [];
+
+      for (const p of pages) {
+        try {
+          const url = p.url();
+          const host = new URL(url).hostname;
+          if (!siteUrls.has(host) && url !== 'about:blank') {
+            siteUrls.add(host);
+            toKeep.push(p);
+          } else {
+            toClose.push(p);
+          }
+        } catch { toClose.push(p); }
       }
-      // Navigate first tab to blank
-      try { await pages[0]?.goto('about:blank', { timeout: 5000 }); } catch {}
+
+      for (const p of toClose) {
+        try { await p.close(); } catch {}
+      }
     } catch {}
     try { await browser.close(); } catch {}
     await stopProfile(profileId);
