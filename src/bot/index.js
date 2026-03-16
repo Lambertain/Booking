@@ -107,6 +107,12 @@ async function handleApprovalResult(action, text) {
     waitingForEdit = false;
     editMediaFiles = [];
 
+    // Trigger immediate send + reset scan timer
+    try {
+      const { triggerSend } = require('../scheduler/index');
+      triggerSend();
+    } catch {}
+
     // Log for training
     try {
       const logDir = path.join(DATA_DIR, modelSlug, 'training');
