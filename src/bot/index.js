@@ -20,15 +20,29 @@ bot.catch((err) => {
   console.error('Bot error:', msg);
 });
 
-// --- Approval state: ONE at a time ---
+// --- State ---
 let currentApproval = null;
 let waitingForEdit = false;
+let waitingForDelivery = false;  // blocks queue until delivery confirmed
 let queueLock = false;
+let editMediaFiles = [];  // collected media during EDIT mode
 
-// --- Queue processor: check file queue every 10s ---
+// --- Called by scheduler after delivery attempt ---
+function onDeliveryResult(success, photographer, site, error) {
+  if (success) {
+    bot.api.sendMessage(CHAT_ID, `✅ Відповідь доставлена: ${photographer} (${site})`).catch(() => {});
+    waitingForDelivery = false;
+    // Queue processor will pick next in 10s
+  } else {
+    bot.api.sendMessage(CHAT_ID, `❌ Не вдалося доставити: ${photographer} (${site})\nПомилка: ${error}\n\nВідправку призупинено. Напишіть "resume" щоб відновити.`).catch(() => {});
+    // Keep waitingForDelivery = true — blocks queue
+  }
+}
+
+// --- Queue processor: check every 10s ---
 function startQueueProcessor() {
   setInterval(async () => {
-    if (currentApproval || queueLock) return;
+    if (currentApproval || queueLock || waitingForDelivery) return;
     const len = queueLength();
     if (len === 0) return;
 
@@ -39,9 +53,10 @@ function startQueueProcessor() {
     currentApproval = item;
     currentApproval.approvalId = `${item.site}-${Date.now()}`;
     waitingForEdit = false;
+    editMediaFiles = [];
     queueLock = false;
 
-    console.log(`[bot] Sending approval: ${item.photographer} (${item.siteLabel}). Queue: ${len - 1} remaining`);
+    console.log(`[bot] Надсилаю на апрув: ${item.photographer} (${item.siteLabel}). Черга: ${len - 1}`);
 
     const text = formatApprovalCard(item);
     const keyboard = buildApprovalKeyboard(item.approvalId);
@@ -66,7 +81,7 @@ function startQueueProcessor() {
   }, 10000);
 }
 
-// --- Handle approval result ---
+// --- Handle approval ---
 async function handleApprovalResult(action, text) {
   const item = currentApproval;
   if (!item) return;
@@ -76,26 +91,34 @@ async function handleApprovalResult(action, text) {
   if (action === 'approve' || action === 'edit') {
     const finalText = action === 'edit' ? text : item.draft;
 
-    // Queue for sending via scheduler's browser session
+    // Queue for sending with media
     addToSendQueue({
       modelSlug,
       site: item.site,
       photographer: item.photographer,
       url: item.url,
-      text: finalText
+      text: finalText,
+      mediaFiles: editMediaFiles.length > 0 ? editMediaFiles : undefined
     });
-    console.log(`[bot] Queued reply for ${item.photographer}`);
+
+    // Block queue until delivery confirmed
+    waitingForDelivery = true;
+    currentApproval = null;
+    waitingForEdit = false;
+    editMediaFiles = [];
 
     // Log for training
-    const logDir = path.join(DATA_DIR, modelSlug, 'training');
-    fs.mkdirSync(logDir, { recursive: true });
-    fs.appendFileSync(path.join(logDir, 'approved-responses.jsonl'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      site: item.site, photographer: item.photographer, url: item.url,
-      language: item.language, messages: item.messages,
-      lastIncoming: item.lastIncoming, aiDraft: item.draft,
-      finalText, action, draftType: item.draftType
-    }) + '\n', 'utf8');
+    try {
+      const logDir = path.join(DATA_DIR, modelSlug, 'training');
+      fs.mkdirSync(logDir, { recursive: true });
+      fs.appendFileSync(path.join(logDir, 'approved-responses.jsonl'), JSON.stringify({
+        timestamp: new Date().toISOString(),
+        site: item.site, photographer: item.photographer, url: item.url,
+        language: item.language, messages: item.messages,
+        lastIncoming: item.lastIncoming, aiDraft: item.draft,
+        finalText, action, draftType: item.draftType
+      }) + '\n', 'utf8');
+    } catch {}
 
     // Record shoot in Airtable
     try {
@@ -103,35 +126,35 @@ async function handleApprovalResult(action, text) {
       if (details) await recordShoot({ ...details, photographer: item.photographer, siteName: item.siteLabel });
     } catch {}
 
-    console.log(`[bot] ${action === 'approve' ? '✅' : '✏️'} ${item.photographer} done`);
+    console.log(`[bot] ${action === 'approve' ? '✅' : '✏️'} ${item.photographer} — чекаємо доставку`);
   } else {
-    console.log(`[bot] ⏭ Skipped: ${item.photographer}`);
+    console.log(`[bot] ⏭ Пропущено: ${item.photographer}`);
+    currentApproval = null;
+    waitingForEdit = false;
+    editMediaFiles = [];
   }
-
-  currentApproval = null;
-  waitingForEdit = false;
-  // Next item will be picked up by interval
 }
 
-// --- Callback handlers ---
+// --- Callbacks ---
 bot.on('callback_query:data', async (ctx) => {
   const [action, ...idParts] = ctx.callbackQuery.data.split(':');
   const approvalId = idParts.join(':');
 
   if (!currentApproval || currentApproval.approvalId !== approvalId) {
-    await ctx.answerCallbackQuery({ text: 'Этот элемент уже не активен' });
+    await ctx.answerCallbackQuery({ text: 'Цей елемент вже не активний' });
     return;
   }
 
   if (action === 'approve') {
-    await ctx.answerCallbackQuery({ text: '✅ Одобрено!' });
+    await ctx.answerCallbackQuery({ text: '✅ Схвалено!' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     await handleApprovalResult('approve', null);
   } else if (action === 'edit') {
     waitingForEdit = true;
-    await ctx.answerCallbackQuery({ text: '✏️ Отправьте исправленный текст' });
+    editMediaFiles = [];
+    await ctx.answerCallbackQuery({ text: '✏️ Надішліть виправлений текст' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
-    await bot.api.sendMessage(CHAT_ID, '✏️ Отправьте исправленный текст ответа:');
+    await bot.api.sendMessage(CHAT_ID, '✏️ Надішліть виправлений текст відповіді.\nМожна додати фото — вони будуть відправлені фотографу.');
   } else if (action === 'skip') {
     await ctx.answerCallbackQuery({ text: '⏭ Пропущено' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
@@ -146,7 +169,7 @@ bot.on('message:text', async (ctx) => {
   // Edit mode — text goes to photographer
   if (currentApproval && waitingForEdit) {
     waitingForEdit = false;
-    await ctx.reply('✅ Текст принят');
+    await ctx.reply('✅ Текст прийнято');
     await handleApprovalResult('edit', text);
     return;
   }
@@ -156,7 +179,8 @@ bot.on('message:text', async (ctx) => {
     try {
       const sched = require('../scheduler/index');
       if (sched.resumeSending) sched.resumeSending();
-      await ctx.reply('▶️ Відправка відновлена');
+      waitingForDelivery = false;
+      await ctx.reply('▶️ Відправку відновлено');
     } catch {}
     return;
   }
@@ -169,23 +193,39 @@ bot.on('message:text', async (ctx) => {
       if (reply.includes('REQUEST_MODEL_INFO')) {
         const clean = reply.replace(/REQUEST_MODEL_INFO/g, '').trim();
         if (clean) await ctx.reply(clean);
-        await bot.api.sendMessage(CHAT_ID, `📋 Для добавления модели мне нужны данные:\n\n1️⃣ Имя модели\n2️⃣ AdsPower Profile ID\n3️⃣ Сайты: model-kartei / adultfolio / modelmayhem\n4️⃣ Adultfolio username\n5️⃣ ModelMayhem profile ID`);
+        await bot.api.sendMessage(CHAT_ID, `📋 Для додавання моделі потрібні дані:\n\n1️⃣ Ім'я моделі\n2️⃣ AdsPower Profile ID\n3️⃣ Сайти: model-kartei / adultfolio / modelmayhem\n4️⃣ Adultfolio username\n5️⃣ ModelMayhem profile ID`);
       } else if (reply.includes('SEND_MEDIA:')) {
-        await ctx.reply(reply.replace(/SEND_MEDIA:[^\n]+/g, '').trim() || 'Медиа в очереди');
+        await ctx.reply(reply.replace(/SEND_MEDIA:[^\n]+/g, '').trim() || 'Медіа в черзі');
       } else {
         await ctx.reply(reply);
       }
     }
   } catch (err) {
     console.error('[agent] Chat error:', err.message);
-    await ctx.reply('⚠️ Ошибка агента: ' + err.message);
+    await ctx.reply('⚠️ Помилка агента: ' + err.message);
   }
 });
 
 // --- Media handler ---
 bot.on('message:photo', async (ctx) => {
   if (currentApproval && waitingForEdit) {
-    await ctx.reply('📎 Фото получено. Отправьте текст ответа.');
+    // Download and save photo for sending to photographer
+    try {
+      const photos = ctx.message.photo;
+      const fileId = photos[photos.length - 1].file_id;
+      const file = await ctx.api.getFile(fileId);
+      const downloadUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+      const tmpDir = path.resolve(__dirname, '../../data/tmp');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const ext = path.extname(file.file_path) || '.jpg';
+      const localPath = path.join(tmpDir, `edit-${Date.now()}${ext}`);
+      const res = await fetch(downloadUrl);
+      fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
+      editMediaFiles.push(localPath);
+      await ctx.reply(`📎 Фото додано (${editMediaFiles.length}). Можна додати ще або надіслати текст відповіді.`);
+    } catch (err) {
+      await ctx.reply('⚠️ Не вдалося зберегти фото: ' + err.message);
+    }
     return;
   }
   const caption = ctx.message.caption || '';
@@ -200,7 +240,21 @@ bot.on('message:photo', async (ctx) => {
 
 bot.on('message:document', async (ctx) => {
   if (currentApproval && waitingForEdit) {
-    await ctx.reply('📎 Файл получен. Отправьте текст ответа.');
+    try {
+      const fileId = ctx.message.document.file_id;
+      const file = await ctx.api.getFile(fileId);
+      const downloadUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+      const tmpDir = path.resolve(__dirname, '../../data/tmp');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const ext = path.extname(file.file_path) || '';
+      const localPath = path.join(tmpDir, `edit-${Date.now()}${ext}`);
+      const res = await fetch(downloadUrl);
+      fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
+      editMediaFiles.push(localPath);
+      await ctx.reply(`📎 Файл додано (${editMediaFiles.length}). Можна додати ще або надіслати текст відповіді.`);
+    } catch (err) {
+      await ctx.reply('⚠️ Не вдалося зберегти файл: ' + err.message);
+    }
     return;
   }
 });
@@ -210,9 +264,7 @@ async function startBot() {
   console.log('Telegram bot starting...');
   await bot.api.deleteWebhook({ drop_pending_updates: true });
   await new Promise(r => setTimeout(r, 2000));
-
   startQueueProcessor();
-
   const startPolling = () => {
     bot.start({ onStart: () => console.log('Telegram bot started'), drop_pending_updates: true })
       .catch(err => {
@@ -227,4 +279,4 @@ async function startBot() {
 
 function stopBot() { bot.stop(); }
 
-module.exports = { bot, startBot, stopBot };
+module.exports = { bot, startBot, stopBot, onDeliveryResult };

@@ -24,13 +24,6 @@ let isRunning = false;
 
 let sendPaused = false;
 
-async function notifyTelegram(text) {
-  try {
-    const { bot } = require('../bot/index');
-    await bot.api.sendMessage(process.env.TELEGRAM_CHAT_ID, text);
-  } catch {}
-}
-
 async function processSendQueue() {
   if (sendPaused) return;
 
@@ -44,16 +37,18 @@ async function processSendQueue() {
       const siteConfig = config.sites.find(s => s.id === toSend.site);
       if (!siteConfig) throw new Error(`Site config not found: ${toSend.site}`);
 
-      await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text);
-      console.log(`[scheduler] ✅ Sent reply to ${toSend.photographer} on ${toSend.site}`);
-      await notifyTelegram(`✅ Відповідь доставлена: ${toSend.photographer} (${toSend.site})`);
+      await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text, toSend.mediaFiles || []);
+      console.log(`[scheduler] ✅ Sent to ${toSend.photographer} on ${toSend.site}`);
+      const { onDeliveryResult } = require('../bot/index');
+      onDeliveryResult(true, toSend.photographer, toSend.site);
     } catch (err) {
       console.error(`[scheduler] Send failed for ${toSend.photographer}: ${err.message}`);
-      // Put back in queue and pause
+      const { onDeliveryResult } = require('../bot/index');
+      onDeliveryResult(false, toSend.photographer, toSend.site, err.message);
       const { addToSendQueue } = require('../pipeline/send-queue');
       addToSendQueue(toSend);
       sendPaused = true;
-      await notifyTelegram(`❌ Не вдалося доставити: ${toSend.photographer} (${toSend.site})\nПомилка: ${err.message}\n\nВідправка призупинена. Напишіть "resume" щоб відновити.`);
+      sendPaused = true;
       break;
     }
   }

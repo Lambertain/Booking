@@ -42,6 +42,15 @@ async function openPage(profileId) {
   const page = context.pages()[0] || await context.newPage();
 
   async function close() {
+    // Close extra tabs, keep only first one
+    try {
+      const pages = context.pages();
+      for (let i = pages.length - 1; i > 0; i--) {
+        try { await pages[i].close(); } catch {}
+      }
+      // Navigate first tab to blank
+      try { await pages[0]?.goto('about:blank', { timeout: 5000 }); } catch {}
+    } catch {}
     try { await browser.close(); } catch {}
     await stopProfile(profileId);
   }
