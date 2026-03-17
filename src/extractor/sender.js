@@ -54,6 +54,14 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
       }
     }
 
+    // Don't submit if nothing to send
+    const hasText = message && message.trim();
+    const hasMedia = mediaFiles.length > 0 && require('fs').existsSync(mediaFiles[0]);
+    if (!hasText && !hasMedia) {
+      console.error('[sender] Nothing to send — skipping submit');
+      return { ok: false, url, reason: 'empty message and no media' };
+    }
+
     await page.locator(rf.submitSelector).click();
     await page.waitForTimeout(6000);
 
