@@ -1,20 +1,45 @@
 const { detectLanguage } = require('./qualify');
 
 async function collectInboxLinks(page) {
-  await page.goto('https://www.modelmayhem.com/mystuff#/inbox', { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(6000);
+  // Use old interface with Sort by: Unread
+  await page.goto('https://www.modelmayhem.com/msg/inbox?sort=unread', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(5000);
 
-  return await page.evaluate(() => {
-    return [...document.querySelectorAll('a[href*="#/read/"]')].slice(0, 22).map(a => ({
-      href: a.href,
-      subject: (a.textContent || '').trim(),
-      photographer: (() => {
-        const wrap = a.closest('.MessagesSection') || a.closest('div')?.parentElement || a.parentElement;
-        const lines = (wrap?.innerText || '').split('\n').map(x => x.trim()).filter(Boolean);
-        return lines[0] && lines[0] !== (a.textContent || '').trim() ? lines[0] : '';
-      })()
-    })).filter(x => x.href);
+  // Also try SPA inbox as fallback
+  let urls = await page.evaluate(() => {
+    // Old interface: table rows with links
+    const rows = [...document.querySelectorAll('tr a[href*="/msg/read/"], a[href*="/mystuff#/read/"]')];
+    return rows.slice(0, 22).map(a => {
+      const href = a.href;
+      const row = a.closest('tr') || a.parentElement;
+      const text = (row?.innerText || '').trim();
+      const lines = text.split('\n').map(x => x.trim()).filter(Boolean);
+      // First cell is usually photographer name
+      const photographer = lines[0] || '';
+      const subject = lines[1] || (a.textContent || '').trim();
+      return { href, subject, photographer };
+    }).filter(x => x.href);
   });
+
+  // If old interface didn't work, try SPA
+  if (urls.length === 0) {
+    await page.goto('https://www.modelmayhem.com/mystuff#/inbox', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(6000);
+    urls = await page.evaluate(() => {
+      return [...document.querySelectorAll('a[href*="#/read/"]')].slice(0, 22).map(a => ({
+        href: a.href,
+        subject: (a.textContent || '').trim(),
+        photographer: (() => {
+          const wrap = a.closest('.MessagesSection') || a.closest('div')?.parentElement || a.parentElement;
+          const lines = (wrap?.innerText || '').split('\n').map(x => x.trim()).filter(Boolean);
+          return lines[0] && lines[0] !== (a.textContent || '').trim() ? lines[0] : '';
+        })()
+      })).filter(x => x.href);
+    });
+  }
+
+  console.log(`  modelmayhem: found ${urls.length} inbox links`);
+  return urls;
 }
 
 async function extractDialog(page, href, selfProfileId, selfName) {
