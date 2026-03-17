@@ -3,6 +3,9 @@
   "adspower": {
     "profileId": "k123o21g"
   },
+  "airtable": {
+    "baseId": "apptpDSywL3IuQqNW"
+  },
   "sites": [
     {
       "id": "model-kartei",

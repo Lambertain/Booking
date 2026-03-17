@@ -6,7 +6,7 @@ const { formatApprovalCard, buildApprovalKeyboard, collectPhotographerImages } =
 const { chat: agentChat } = require('../ai/agent');
 const { takeNext, queueLength } = require('../pipeline/queue');
 const { addToSendQueue } = require('../pipeline/send-queue');
-const { recordShoot } = require('../airtable/index');
+const { recordShoot, setAirtableBase } = require('../airtable/index');
 const { extractShootDetails } = require('../ai/grok');
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
@@ -126,10 +126,14 @@ async function handleApprovalResult(action, text) {
       }) + '\n', 'utf8');
     } catch {}
 
-    // Record shoot in Airtable
+    // Record shoot in Airtable (per-model credentials)
     try {
-      const details = await extractShootDetails(item.messages, item.photographer, item.siteLabel);
-      if (details) await recordShoot({ ...details, photographer: item.photographer, siteName: item.siteLabel });
+      const config = JSON.parse(fs.readFileSync(path.join(MODELS_DIR, modelSlug, 'config.json'), 'utf8'));
+      if (config.airtable?.baseId) {
+        setAirtableBase(config.airtable.baseId);
+        const details = await extractShootDetails(item.messages, item.photographer, item.siteLabel);
+        if (details) await recordShoot({ ...details, photographer: item.photographer, siteName: item.siteLabel });
+      }
     } catch {}
 
     console.log(`[bot] ${action === 'approve' ? '✅' : '✏️'} ${item.photographer} — чекаємо доставку`);
@@ -199,7 +203,7 @@ bot.on('message:text', async (ctx) => {
       if (reply.includes('REQUEST_MODEL_INFO')) {
         const clean = reply.replace(/REQUEST_MODEL_INFO/g, '').trim();
         if (clean) await ctx.reply(clean);
-        await bot.api.sendMessage(CHAT_ID, `📋 Для додавання моделі потрібні дані:\n\n1️⃣ Ім'я моделі\n2️⃣ AdsPower Profile ID\n3️⃣ Сайти: model-kartei / adultfolio / modelmayhem\n4️⃣ Adultfolio username\n5️⃣ ModelMayhem profile ID\n6️⃣ Прайс моделі`);
+        await bot.api.sendMessage(CHAT_ID, `📋 Для додавання моделі потрібні дані:\n\n1️⃣ Ім'я моделі\n2️⃣ AdsPower Profile ID\n3️⃣ Сайти: model-kartei / adultfolio / modelmayhem\n4️⃣ Adultfolio username\n5️⃣ ModelMayhem profile ID\n6️⃣ Прайс моделі\n7️⃣ Посилання на Airtable базу моделі`);
       } else if (reply.includes('SEND_MEDIA:')) {
         await ctx.reply(reply.replace(/SEND_MEDIA:[^\n]+/g, '').trim() || 'Медіа в черзі');
       } else {

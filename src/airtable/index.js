@@ -1,5 +1,4 @@
 const API_BASE = 'https://api.airtable.com/v0';
-const BASE_ID = process.env.AIRTABLE_BASE_ID;
 
 const TABLES = {
   shoots: 'Трекер съемок',
@@ -7,12 +6,20 @@ const TABLES = {
   photographers: 'Фотографы'
 };
 
+// Per-model Airtable base, API key from env (one account)
+let currentBaseId = process.env.AIRTABLE_BASE_ID;
+
+function setAirtableBase(baseId) {
+  currentBaseId = baseId;
+}
+
 async function airtableFetch(tableName, method = 'GET', body = null, params = '') {
   const token = process.env.AIRTABLE_API_KEY;
-  if (!token) throw new Error('Missing AIRTABLE_API_KEY env');
-  if (!BASE_ID) throw new Error('Missing AIRTABLE_BASE_ID env');
+  const baseId = currentBaseId;
+  if (!token) throw new Error('Missing Airtable API key');
+  if (!baseId) throw new Error('Missing Airtable Base ID');
 
-  const url = `${API_BASE}/${BASE_ID}/${encodeURIComponent(tableName)}${params}`;
+  const url = `${API_BASE}/${baseId}/${encodeURIComponent(tableName)}${params}`;
   const opts = {
     method,
     headers: {
@@ -137,4 +144,4 @@ async function recordShoot(shootDetails) {
   return record;
 }
 
-module.exports = { findOrCreateSite, findOrCreatePhotographer, createShoot, recordShoot };
+module.exports = { findOrCreateSite, findOrCreatePhotographer, createShoot, recordShoot, setAirtableBase };

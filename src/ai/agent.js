@@ -263,6 +263,9 @@ CONFIG_SET:<slug>:<json_path>:<value>
   → REMOVE_MODEL:katya-s
 - "modelmayhem id для Katya 9876543"
   → CONFIG_SET:katya-s:sites.modelmayhem.selfProfileId:9876543
+- "airtable для Katya https://airtable.com/appABC123/tblXYZ"
+  → CONFIG_SET:katya-s:airtable.baseId:appABC123
+  (витягуй Base ID з посилання — це частина після airtable.com/ що починається з "app")
 
 ОТПРАВКА МЕДИА ФОТОГРАФУ:
 Когда менеджер просит отправить фото/файлы фотографу из буфера:
@@ -395,6 +398,11 @@ async function chat(userMessage) {
             } else {
               actionResults.push(`⚠️ Сайт ${parts[1]} не найден у ${a.slug}`);
             }
+          } else if (parts[0] === 'airtable' && parts.length === 2) {
+            if (!config.airtable) config.airtable = {};
+            config.airtable[parts[1]] = a.value;
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+            actionResults.push(`⚙️ ${a.slug}: airtable.${parts[1]} = ${a.value.slice(0, 20)}...`);
           } else {
             actionResults.push(`⚠️ Неизвестный путь: ${a.path}`);
           }
