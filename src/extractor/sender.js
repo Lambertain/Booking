@@ -11,6 +11,8 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
     const formExists = await page.locator(rf.formSelector).count();
     if (!formExists) throw new Error('Reply form not found on page');
 
+    // Fill text only if provided
+    if (message && message.trim()) {
     const editor = page.locator(rf.editorSelector).first();
     await editor.click();
     await page.evaluate(({ message, editorSel, textareaSel }) => {
@@ -32,6 +34,7 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
         ta.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }, { message, editorSel: rf.editorSelector, textareaSel: rf.textareaSelector });
+    } // end if (message)
 
     if (mediaFiles.length > 0) {
       const fs = require('fs');

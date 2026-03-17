@@ -238,8 +238,64 @@ bot.on('message:photo', async (ctx) => {
     }
     return;
   }
+  // Photo with caption — check if it's "send to photographer" command
   const caption = ctx.message.caption || '';
   if (caption) {
+    // Try parse: "photographer site [optional message text]"
+    const sendMatch = caption.match(/^(.+?)\s+(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)(?:\s*\n([\s\S]*))?$/i) ||
+      caption.match(/^(.+?)\s+(?:on|на)\s+(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)(?:\s*\n([\s\S]*))?$/i);
+
+    if (sendMatch) {
+      const photographer = sendMatch[1].trim();
+      let site = sendMatch[2].trim().toLowerCase().replace(/\s+/g, '');
+      if (site === 'modelkartei') site = 'model-kartei';
+      if (site === 'modelmayhem') site = 'modelmayhem';
+
+      try {
+        const photos = ctx.message.photo;
+        const fileId = photos[photos.length - 1].file_id;
+        const file = await ctx.api.getFile(fileId);
+        const downloadUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+        const tmpDir = path.resolve(__dirname, '../../data/tmp');
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const ext = path.extname(file.file_path) || '.jpg';
+        const localPath = path.join(tmpDir, `direct-${Date.now()}${ext}`);
+        const res = await fetch(downloadUrl);
+        fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
+
+        // Find URL from processed dialogs
+        const processed = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'processed', 'processed-ids.json'), 'utf8'));
+        let url = '';
+        for (const [key, val] of Object.entries(processed)) {
+          if (key.includes(photographer) && key.startsWith(site)) {
+            url = key.split('::')[2] || '';
+            break;
+          }
+        }
+
+        if (url) {
+          const messageText = (sendMatch[3] || '').trim();
+          addToSendQueue({
+            modelSlug: 'ana-v',
+            site,
+            photographer,
+            url,
+            text: messageText,
+            mediaFiles: [localPath]
+          });
+          const { triggerSend } = require('../scheduler/index');
+          triggerSend();
+          await ctx.reply(`📤 Фото для ${photographer} (${site}) в черзі на відправку`);
+        } else {
+          await ctx.reply(`⚠️ Не знайдено діалог з ${photographer} на ${site}`);
+        }
+      } catch (err) {
+        await ctx.reply('⚠️ Помилка: ' + err.message);
+      }
+      return;
+    }
+
+    // Regular photo with caption — agent chat
     try {
       await ctx.replyWithChatAction('typing');
       const reply = await agentChat(`[Фото] ${caption}`);
