@@ -312,25 +312,34 @@ async function runPipelineForModel(modelSlug) {
   // 3. Qualify → draft → approve/send
   for (const item of newItems) {
     try {
-      // Qualify with Grok AI
-      const q = await qualifyDialog(item.messages, item.photographer, item.siteLabel);
-      item.qualified = q.qualified;
-      item.qualificationReason = q.reason;
+      // Check if this is an active dialog (we already replied before)
+      const activeDialogs = loadActiveDialogs(modelSlug);
+      const isActive = activeDialogs.some(d => d.url === item.url || d.photographer === item.photographer);
 
-      if (!q.qualified) {
-        console.log(`[pipeline] ❌ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
-        // Remove from active — photographer refused or lost interest
-        removeActiveDialog(modelSlug, item.url);
-        processed[makeDialogId(item)] = {
-          msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
-          lastIncoming: item.lastIncoming || '',
-          timestamp: new Date().toISOString()
-        };
-        saveProcessed(modelSlug, processed);
-        continue;
+      if (isActive) {
+        // Active dialog — skip Grok qualification, go straight to draft
+        console.log(`[pipeline] 🔄 Активний діалог: ${item.photographer} (${item.siteLabel})`);
+        item.qualified = true;
+        item.qualificationReason = 'active dialog';
+      } else {
+        // New dialog — qualify with Grok AI
+        const q = await qualifyDialog(item.messages, item.photographer, item.siteLabel);
+        item.qualified = q.qualified;
+        item.qualificationReason = q.reason;
+
+        if (!q.qualified) {
+          console.log(`[pipeline] ❌ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
+          processed[makeDialogId(item)] = {
+            msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
+            lastIncoming: item.lastIncoming || '',
+            timestamp: new Date().toISOString()
+          };
+          saveProcessed(modelSlug, processed);
+          continue;
+        }
+
+        console.log(`[pipeline] ✅ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
       }
-
-      console.log(`[pipeline] ✅ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
 
       // Generate draft with Grok
       const draft = await generateDraft(
