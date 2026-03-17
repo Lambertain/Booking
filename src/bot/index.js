@@ -280,14 +280,32 @@ bot.on('message:photo', async (ctx) => {
         const res = await fetch(downloadUrl);
         fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
 
-        // Find URL from processed dialogs
-        const processed = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'processed', 'processed-ids.json'), 'utf8'));
+        // Find URL from processed dialogs, active dialogs, or training log
         let url = '';
-        for (const [key, val] of Object.entries(processed)) {
-          if (key.includes(photographer) && key.startsWith(site)) {
-            url = key.split('::')[2] || '';
-            break;
+        // 1. Processed IDs
+        try {
+          const processed = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'processed', 'processed-ids.json'), 'utf8'));
+          for (const key of Object.keys(processed)) {
+            if (key.includes(photographer) && key.startsWith(site)) { url = key.split('::')[2] || ''; break; }
           }
+        } catch {}
+        // 2. Active dialogs
+        if (!url) {
+          try {
+            const active = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'processed', 'active-dialogs.json'), 'utf8'));
+            const found = active.find(d => d.photographer === photographer && d.site === site);
+            if (found) url = found.url;
+          } catch {}
+        }
+        // 3. Training log
+        if (!url) {
+          try {
+            const lines = fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'training', 'approved-responses.jsonl'), 'utf8').trim().split('\n');
+            for (const line of lines.reverse()) {
+              const e = JSON.parse(line);
+              if (e.photographer === photographer && e.site === site && e.url) { url = e.url; break; }
+            }
+          } catch {}
         }
 
         if (url) {
