@@ -242,9 +242,25 @@ bot.on('message:photo', async (ctx) => {
   // Photo with caption — check if it's "send to photographer" command
   const caption = ctx.message.caption || '';
   if (caption) {
-    // Try parse: "photographer site [optional message text]"
-    const sendMatch = caption.match(/^(.+?)\s+(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)(?:\s*\n([\s\S]*))?$/i) ||
-      caption.match(/^(.+?)\s+(?:on|на)\s+(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)(?:\s*\n([\s\S]*))?$/i);
+    // Parse caption: various formats
+    // "BenjHDF adultfolio" or "📸 BenjHDF\n🌐 adultfolio.com" or "BenjHDF on adultfolio\ntext"
+    const cleanCaption = caption.replace(/📸\s*/g, '').replace(/🌐\s*/g, '').replace(/\.com/g, '').trim();
+    const lines = cleanCaption.split('\n').map(l => l.trim()).filter(Boolean);
+
+    let sendMatch = null;
+    if (lines.length >= 2) {
+      // Multi-line: first line = photographer, second = site, rest = message
+      const siteMatch = lines[1].match(/^(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)$/i);
+      if (siteMatch) {
+        sendMatch = [null, lines[0], siteMatch[1], lines.slice(2).join('\n')];
+      }
+    }
+    if (!sendMatch) {
+      // Single line: "photographer site" or "photographer on/на site"
+      const m = cleanCaption.match(/^(.+?)\s+(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)(?:\s*\n([\s\S]*))?$/i) ||
+        cleanCaption.match(/^(.+?)\s+(?:on|на)\s+(adultfolio|model-kartei|modelmayhem|model kartei|model mayhem)(?:\s*\n([\s\S]*))?$/i);
+      if (m) sendMatch = m;
+    }
 
     if (sendMatch) {
       const photographer = sendMatch[1].trim();
