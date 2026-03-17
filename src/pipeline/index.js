@@ -285,7 +285,10 @@ async function runPipelineForModel(modelSlug) {
 
     // Skip if last message is ours — we already replied
     const lastMsg = msgs[msgs.length - 1];
-    if (lastMsg.role === 'self') return false;
+    if (lastMsg.role === 'self') {
+      console.log(`[pipeline] ⏩ ${item.photographer}: останнє смс наше, скіп`);
+      return false;
+    }
 
     const id = makeDialogId(item);
     const prev = processed[id];
@@ -364,8 +367,12 @@ async function runPipelineForModel(modelSlug) {
         console.log(`[pipeline] Already in queue: ${item.photographer}`);
       }
 
-      processedIds.add(makeDialogId(item));
-      saveProcessedIds(modelSlug, processedIds);
+      processed[makeDialogId(item)] = {
+        msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
+        lastIncoming: item.lastIncoming || '',
+        timestamp: new Date().toISOString()
+      };
+      saveProcessed(modelSlug, processed);
     } catch (err) {
       console.error(`[pipeline] Error processing ${item.photographer}: ${err.message}`);
     }
