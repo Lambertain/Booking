@@ -39,29 +39,35 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
 
     if (mediaFiles.length > 0) {
       const fs = require('fs');
-      const pathMod = require('path');
       const existing = mediaFiles.filter(f => fs.existsSync(f));
       console.log(`[sender] Media files: ${mediaFiles.length} total, ${existing.length} exist`);
       if (existing.length > 0) {
-        // Adultfolio: insert images directly into Summernote editor + sync textarea
+        // Click into editor first
+        await page.locator(rf.editorSelector).first().click();
+        await page.waitForTimeout(1000);
+
+        // Paste images via clipboard — adultfolio uploads them to their server
         for (const filePath of existing) {
-          const base64 = fs.readFileSync(filePath).toString('base64');
-          const ext = pathMod.extname(filePath).slice(1) || 'jpeg';
-          await page.evaluate(({ b64, ext, editorSel }) => {
-            const editor = document.querySelector(editorSel);
-            const ta = document.querySelector('textarea#message');
-            if (editor) {
-              const img = document.createElement('img');
-              img.src = 'data:image/' + ext + ';base64,' + b64;
-              img.style.maxWidth = '600px';
-              editor.appendChild(img);
-              if (ta) ta.value = editor.innerHTML;
-              editor.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          }, { b64: base64, ext, editorSel: rf.editorSelector });
+          const b64 = fs.readFileSync(filePath).toString('base64');
+          await page.evaluate(async (b64) => {
+            const byteString = atob(b64);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+            const blob = new Blob([ab], { type: 'image/jpeg' });
+            const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const editor = document.querySelector('div.note-editable.panel-body');
+            editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+          }, b64);
+          await page.waitForTimeout(3000); // wait for adultfolio to upload
         }
-        await page.waitForTimeout(2000);
-        console.log(`[sender] ${existing.length} images inserted into editor`);
+
+        const imgCount = await page.evaluate((sel) => {
+          return document.querySelector(sel)?.querySelectorAll('img').length || 0;
+        }, rf.editorSelector);
+        console.log(`[sender] ${imgCount} images uploaded via paste`);
       }
     }
 
