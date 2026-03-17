@@ -43,26 +43,25 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
       const existing = mediaFiles.filter(f => fs.existsSync(f));
       console.log(`[sender] Media files: ${mediaFiles.length} total, ${existing.length} exist`);
       if (existing.length > 0) {
-        // Adultfolio uses Summernote editor — insert images directly into editor
+        // Adultfolio: insert images directly into Summernote editor + sync textarea
         for (const filePath of existing) {
           const base64 = fs.readFileSync(filePath).toString('base64');
           const ext = pathMod.extname(filePath).slice(1) || 'jpeg';
-          const dataUrl = `data:image/${ext};base64,${base64}`;
-          await page.evaluate(({ dataUrl, editorSel }) => {
+          await page.evaluate(({ b64, ext, editorSel }) => {
             const editor = document.querySelector(editorSel);
+            const ta = document.querySelector('textarea#message');
             if (editor) {
               const img = document.createElement('img');
-              img.src = dataUrl;
-              img.style.maxWidth = '100%';
+              img.src = 'data:image/' + ext + ';base64,' + b64;
+              img.style.maxWidth = '600px';
               editor.appendChild(img);
+              if (ta) ta.value = editor.innerHTML;
               editor.dispatchEvent(new Event('input', { bubbles: true }));
             }
-          }, { dataUrl, editorSel: rf.editorSelector });
+          }, { b64: base64, ext, editorSel: rf.editorSelector });
         }
         await page.waitForTimeout(2000);
-        console.log(`[sender] Media inserted into editor: ${existing.length} files`);
-      } else {
-        console.error(`[sender] No media files found: ${mediaFiles.join(', ')}`);
+        console.log(`[sender] ${existing.length} images inserted into editor`);
       }
     }
 
