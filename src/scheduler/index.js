@@ -50,8 +50,17 @@ async function processSendQueue() {
   }
 }
 
+let isSending = false;
+
 // --- Triggered by bot after approve/edit: send + full scan ---
 async function triggerSend() {
+  // Send queue always works, even if pipeline is running
+  if (!isSending) {
+    isSending = true;
+    try { await processSendQueue(); } finally { isSending = false; }
+  }
+
+  // Full scan only if pipeline not running
   if (isRunning) return;
   isRunning = true;
   try {
