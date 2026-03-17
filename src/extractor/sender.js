@@ -39,17 +39,28 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
 
     if (mediaFiles.length > 0) {
       const fs = require('fs');
+      const pathMod = require('path');
       const existing = mediaFiles.filter(f => fs.existsSync(f));
       console.log(`[sender] Media files: ${mediaFiles.length} total, ${existing.length} exist`);
       if (existing.length > 0) {
-        const fileInput = page.locator(rf.fileInputSelector);
-        if (await fileInput.count() > 0) {
-          await fileInput.setInputFiles(existing);
-          await page.waitForTimeout(5000);
-          console.log(`[sender] Media uploaded: ${existing.length} files`);
-        } else {
-          console.error('[sender] File input not found on page');
+        // Adultfolio uses Summernote editor — insert images directly into editor
+        for (const filePath of existing) {
+          const base64 = fs.readFileSync(filePath).toString('base64');
+          const ext = pathMod.extname(filePath).slice(1) || 'jpeg';
+          const dataUrl = `data:image/${ext};base64,${base64}`;
+          await page.evaluate(({ dataUrl, editorSel }) => {
+            const editor = document.querySelector(editorSel);
+            if (editor) {
+              const img = document.createElement('img');
+              img.src = dataUrl;
+              img.style.maxWidth = '100%';
+              editor.appendChild(img);
+              editor.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }, { dataUrl, editorSel: rf.editorSelector });
         }
+        await page.waitForTimeout(2000);
+        console.log(`[sender] Media inserted into editor: ${existing.length} files`);
       } else {
         console.error(`[sender] No media files found: ${mediaFiles.join(', ')}`);
       }
