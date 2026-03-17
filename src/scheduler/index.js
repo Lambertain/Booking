@@ -60,11 +60,13 @@ async function triggerSend() {
     try { await processSendQueue(); } finally { isSending = false; }
   }
 
+  // Wait for AdsPower to settle after sender closed it
+  await new Promise(r => setTimeout(r, 3000));
+
   // Full scan only if pipeline not running
   if (isRunning) return;
   isRunning = true;
   try {
-    await processSendQueue();
     // Full scan — photographer may have replied
     if (isWorkingHours()) {
       const models = getModelSlugs();
