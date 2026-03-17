@@ -34,9 +34,21 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
     }, { message, editorSel: rf.editorSelector, textareaSel: rf.textareaSelector });
 
     if (mediaFiles.length > 0) {
-      const fileInput = page.locator(rf.fileInputSelector);
-      await fileInput.setInputFiles(mediaFiles);
-      await page.waitForTimeout(5000);
+      const fs = require('fs');
+      const existing = mediaFiles.filter(f => fs.existsSync(f));
+      console.log(`[sender] Media files: ${mediaFiles.length} total, ${existing.length} exist`);
+      if (existing.length > 0) {
+        const fileInput = page.locator(rf.fileInputSelector);
+        if (await fileInput.count() > 0) {
+          await fileInput.setInputFiles(existing);
+          await page.waitForTimeout(5000);
+          console.log(`[sender] Media uploaded: ${existing.length} files`);
+        } else {
+          console.error('[sender] File input not found on page');
+        }
+      } else {
+        console.error(`[sender] No media files found: ${mediaFiles.join(', ')}`);
+      }
     }
 
     await page.locator(rf.submitSelector).click();
