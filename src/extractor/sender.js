@@ -2,9 +2,10 @@ const { openPage } = require('./adspower');
 
 async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFiles = []) {
   const session = await openPage(profileId);
-  const { page } = session;
+  // Open new tab to avoid conflicts with existing tabs
+  const page = await session.context.newPage();
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(5000);
 
     const rf = siteConfig.replyForm;
@@ -73,9 +74,9 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
 
 async function sendModelMayhemReply(profileId, siteConfig, url, message) {
   const session = await openPage(profileId);
-  const { page } = session;
+  const page = await session.context.newPage();
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(5000);
 
     // Fill reply textarea
@@ -98,9 +99,9 @@ async function sendModelMayhemReply(profileId, siteConfig, url, message) {
 
 async function sendModelKarteiReply(profileId, siteConfig, url, message) {
   const session = await openPage(profileId);
-  const { page } = session;
+  const page = await session.context.newPage();
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(4000);
 
     const textarea = page.locator('textarea#pnTextpost');
