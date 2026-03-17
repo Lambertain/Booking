@@ -218,6 +218,7 @@ bot.on('message:text', async (ctx) => {
 
 // --- Media handler ---
 bot.on('message:photo', async (ctx) => {
+  console.log(`[bot] Photo received. Caption: "${ctx.message.caption || '(none)'}"`);
   if (currentApproval && waitingForEdit) {
     // Download and save photo for sending to photographer
     try {
