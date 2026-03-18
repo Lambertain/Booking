@@ -11,20 +11,17 @@ function isUiNoise(text) {
 async function discoverDialogUrls(page, site) {
   const sel = site.selectors;
 
-  // Try unread first, then all messages
-  const pagesToTry = [site.unreadUrl, site.messageUrl].filter(Boolean);
-
-  for (const url of pagesToTry) {
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+  // If unread URL is configured, use it exclusively — don't fall back to all messages
+  // Falling back to /pn/ (all messages) causes old answered conversations to be re-processed
+  if (site.unreadUrl) {
+    await page.goto(site.unreadUrl, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
 
-    // Primary: find links inside .lWrapper containers
     let urls = await page.evaluate(({ itemSel, linkSel }) => {
       const rows = [...document.querySelectorAll(itemSel)];
       return [...new Set(rows.map(r => r.querySelector(linkSel)?.href).filter(Boolean))];
     }, { itemSel: sel.dialogItem, linkSel: sel.dialogOpenTarget });
 
-    // Fallback: find all dialog links by pattern /pn/\d+/
     if (urls.length === 0) {
       urls = await page.evaluate(() => {
         return [...new Set(
@@ -36,12 +33,39 @@ async function discoverDialogUrls(page, site) {
     }
 
     if (urls.length > 0) {
-      console.log(`  model-kartei: found ${urls.length} dialog URLs from ${url}`);
+      console.log(`  model-kartei: found ${urls.length} unread dialog URLs`);
       return urls.slice(0, 22);
     }
+
+    console.log('  model-kartei: no unread dialogs');
+    return [];
   }
 
-  console.log('  model-kartei: no dialog URLs found on any page');
+  // No unread URL — use all messages page
+  await page.goto(site.messageUrl, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(4000);
+
+  let urls = await page.evaluate(({ itemSel, linkSel }) => {
+    const rows = [...document.querySelectorAll(itemSel)];
+    return [...new Set(rows.map(r => r.querySelector(linkSel)?.href).filter(Boolean))];
+  }, { itemSel: sel.dialogItem, linkSel: sel.dialogOpenTarget });
+
+  if (urls.length === 0) {
+    urls = await page.evaluate(() => {
+      return [...new Set(
+        [...document.querySelectorAll('a[href*="/pn/"]')]
+          .map(a => a.href)
+          .filter(href => /\/pn\/\d+\/?$/.test(href))
+      )];
+    });
+  }
+
+  if (urls.length > 0) {
+    console.log(`  model-kartei: found ${urls.length} dialog URLs`);
+    return urls.slice(0, 22);
+  }
+
+  console.log('  model-kartei: no dialog URLs found');
   return [];
 }
 

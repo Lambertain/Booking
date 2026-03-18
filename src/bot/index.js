@@ -201,8 +201,6 @@ bot.on('message:text', async (ctx) => {
     const reply = await agentChat(text);
     if (reply) {
       if (reply.includes('REQUEST_MODEL_INFO')) {
-        const clean = reply.replace(/REQUEST_MODEL_INFO/g, '').trim();
-        if (clean) await ctx.reply(clean);
         await bot.api.sendMessage(CHAT_ID, `📋 Для додавання моделі потрібні дані:\n\n1️⃣ Ім'я моделі\n2️⃣ AdsPower Profile ID\n3️⃣ Сайти: model-kartei / adultfolio / modelmayhem\n4️⃣ Adultfolio username\n5️⃣ ModelMayhem profile ID\n6️⃣ Прайс моделі\n7️⃣ Посилання на Airtable базу моделі`);
       } else if (reply.includes('SEND_MEDIA:')) {
         await ctx.reply(reply.replace(/SEND_MEDIA:[^\n]+/g, '').trim() || 'Медіа в черзі');

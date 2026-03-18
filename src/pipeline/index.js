@@ -279,6 +279,26 @@ async function runPipelineForModel(modelSlug) {
   // 2. Filter: only dialogs where last message is from photographer (not us)
   //    AND either never seen or photographer sent new messages
   const processed = loadProcessed(modelSlug);
+  const isBootstrap = Object.keys(processed).length === 0;
+
+  if (isBootstrap && allDialogs.length > 0) {
+    // First run for this model — mark all existing conversations as known
+    // without generating drafts, so we don't spam old conversations
+    console.log(`[pipeline] 🆕 Bootstrap: перший запуск для ${modelName}, маркую ${allDialogs.length} діалогів як відомі`);
+    for (const item of allDialogs) {
+      const msgs = item.messages || [];
+      const id = makeDialogId(item);
+      processed[id] = {
+        msgCount: msgs.filter(m => m.role === 'interlocutor').length,
+        lastIncoming: item.lastIncoming || '',
+        timestamp: new Date().toISOString()
+      };
+    }
+    saveProcessed(modelSlug, processed);
+    console.log(`[pipeline] ✅ Bootstrap завершено: ${allDialogs.length} діалогів збережено. Наступний скан обробить тільки нові.`);
+    return;
+  }
+
   const newItems = allDialogs.filter(item => {
     const msgs = item.messages || [];
     if (msgs.length === 0) return false;
@@ -292,7 +312,23 @@ async function runPipelineForModel(modelSlug) {
 
     const id = makeDialogId(item);
     const prev = processed[id];
-    if (!prev) return true; // never seen
+
+    if (!prev) {
+      // Never seen — but check if we already have self messages in history
+      // If yes, this is an old conversation that existed before the system
+      const hasSelfMessages = msgs.some(m => m.role === 'self');
+      if (hasSelfMessages) {
+        console.log(`[pipeline] ⏩ ${item.photographer}: є наші відповіді в історії, маркую як відомий`);
+        processed[id] = {
+          msgCount: msgs.filter(m => m.role === 'interlocutor').length,
+          lastIncoming: item.lastIncoming || '',
+          timestamp: new Date().toISOString()
+        };
+        saveProcessed(modelSlug, processed);
+        return false;
+      }
+      return true; // truly new — no self messages, never seen
+    }
 
     // Check if photographer sent new messages since we last processed
     const lastIncoming = item.lastIncoming || '';
