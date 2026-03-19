@@ -7,7 +7,8 @@ const fs = require('fs');
   // Use kisa profile (has purpleport)
   const config = JSON.parse(fs.readFileSync('./models/kisa/config.json', 'utf8'));
   const profileId = config.adspower.profileId;
-  const ppConfig = config.sites?.find(s => s.id === 'purpleport');
+  let ppConfig = config.sites?.find(s => s.id === 'purpleport');
+  if (!ppConfig) ppConfig = { messageUrl: 'https://purpleport.com/inbox' };
 
   if (!ppConfig) {
     console.log('No purpleport config found for kisa. Add it first.');
