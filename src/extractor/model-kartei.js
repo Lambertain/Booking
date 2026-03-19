@@ -73,24 +73,24 @@ async function extractSingleDialog(page, sel, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
 
-  const messages = await page.evaluate(({ rowSel, textSel, selfSel }) => {
-    return [...document.querySelectorAll(rowSel)].map(row => {
+  const result = await page.evaluate(({ rowSel, textSel, selfSel }) => {
+    const rows = [...document.querySelectorAll(rowSel)];
+    let photographer = '';
+    const messages = rows.map(row => {
       const text = (row.querySelector(textSel)?.innerText || '').trim();
       const isSelf = row.matches(selfSel) || row.className.includes('sedcard1');
+      // Get photographer name from first interlocutor message block
+      if (!isSelf && !photographer) {
+        // Try: username link, any link with text, bold text, or first text node in the header area
+        const nameEl = row.querySelector('a.username, .username, a[href*="/sedcards/"], a[href*="/portfolios/"]');
+        if (nameEl) photographer = nameEl.textContent.trim();
+      }
       return { role: isSelf ? 'self' : 'interlocutor', text };
     });
+    return { messages, photographer };
   }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf });
 
-  const photographer = await page.evaluate(() => {
-    // sedcard2 = interlocutor (photographer), sedcard1 = self (model)
-    for (const s of ['.sedcard2 .username', '.mailWrapper.sedcard2 .username', '.mailContent .username', '.username', 'h1', 'h2']) {
-      const v = document.querySelector(s)?.textContent?.trim();
-      if (v) return v;
-    }
-    return '';
-  });
-
-  return { url, photographer, messages };
+  return { url, photographer: result.photographer, messages: result.messages };
 }
 
 async function extract(page, siteConfig, modelName) {
