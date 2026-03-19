@@ -82,7 +82,8 @@ async function extractSingleDialog(page, sel, url) {
   }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf });
 
   const photographer = await page.evaluate(() => {
-    for (const s of ['.mailContent .username', '.username', 'h1', 'h2']) {
+    // sedcard2 = interlocutor (photographer), sedcard1 = self (model)
+    for (const s of ['.sedcard2 .username', '.mailWrapper.sedcard2 .username', '.mailContent .username', '.username', 'h1', 'h2']) {
       const v = document.querySelector(s)?.textContent?.trim();
       if (v) return v;
     }
