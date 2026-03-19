@@ -48,6 +48,13 @@ const SITE_TEMPLATES = {
     baseUrl: 'https://www.modelmayhem.com/',
     messageUrl: 'https://www.modelmayhem.com/mystuff#/inbox',
     selfProfileId: ''
+  },
+  'purpleport': {
+    id: 'purpleport',
+    label: 'PurplePort',
+    baseUrl: 'https://purpleport.com/',
+    messageUrl: 'https://purpleport.com/account/messages/',
+    selfProfilePattern: ''
   }
 };
 
@@ -238,9 +245,10 @@ SAVE:<slug>:<ключ>:<значение>
 Для добавления модели нужны ВСЕ данные:
 - Имя модели
 - AdsPower profile ID
-- Сайты (model-kartei, adultfolio, modelmayhem)
+- Сайты (model-kartei, adultfolio, modelmayhem, purpleport)
 - selfProfilePattern для adultfolio (имя в URL профиля)
 - selfProfileId для modelmayhem (числовой ID)
+- selfProfilePattern для purpleport (имя в URL профиля)
 
 Если менеджер просит добавить модель но НЕ указал все данные — запроси их через:
 REQUEST_MODEL_INFO

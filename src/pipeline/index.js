@@ -4,6 +4,7 @@ const { openPage } = require('../extractor/adspower');
 const modelKartei = require('../extractor/model-kartei');
 const adultfolio = require('../extractor/adultfolio');
 const modelmayhem = require('../extractor/modelmayhem');
+const purpleport = require('../extractor/purpleport');
 const { generateDraft, qualifyDialog, classifyDraft, extractShootDetails } = require('../ai/grok');
 const { addToQueue } = require('./queue');
 const { sendReply } = require('../extractor/sender');
@@ -20,7 +21,8 @@ const TRAINING_MODE = true;
 const extractors = {
   'model-kartei': modelKartei,
   'adultfolio': adultfolio,
-  'modelmayhem': modelmayhem
+  'modelmayhem': modelmayhem,
+  'purpleport': purpleport
 };
 
 function loadModelConfig(modelSlug) {
@@ -148,6 +150,37 @@ async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
 
     return {
       site: 'modelmayhem', siteLabel: 'Model Mayhem', model: modelName,
+      photographer: active.photographer, url: active.url,
+      language: detectLanguage(lastIncoming.text), messages: dialog.messages, lastIncoming: lastIncoming.text
+    };
+  }
+
+  if (active.site === 'purpleport') {
+    // Re-extract via the main extractor for single URL
+    const selfPattern = siteConfig.selfProfilePattern || modelName;
+    const dialog = await page.evaluate((selfPat) => {
+      const containers = document.querySelectorAll(
+        '.message, .msg, [class*="message"], [class*="thread"] > div, .conversation-message'
+      );
+      const messages = [];
+      for (const el of containers) {
+        const text = (el.innerText || '').trim();
+        if (!text || text.length < 5) continue;
+        const isSelf = el.classList.contains('sent') ||
+          el.classList.contains('outgoing') ||
+          el.classList.contains('mine') ||
+          (el.querySelector('a[href]')?.textContent || '').toLowerCase().includes(selfPat.toLowerCase());
+        messages.push({ role: isSelf ? 'self' : 'interlocutor', text: text.slice(0, 2000) });
+      }
+      return { messages };
+    }, selfPattern);
+
+    if (dialog.messages.length === 0) return null;
+    const lastIncoming = [...dialog.messages].reverse().find(m => m.role === 'interlocutor');
+    if (!lastIncoming) return null;
+
+    return {
+      site: 'purpleport', siteLabel: 'PurplePort', model: modelName,
       photographer: active.photographer, url: active.url,
       language: detectLanguage(lastIncoming.text), messages: dialog.messages, lastIncoming: lastIncoming.text
     };
