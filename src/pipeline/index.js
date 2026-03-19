@@ -8,6 +8,7 @@ const { generateDraft, qualifyDialog, classifyDraft, extractShootDetails } = req
 const { addToQueue } = require('./queue');
 const { sendReply } = require('../extractor/sender');
 const { recordShoot } = require('../airtable/index');
+const db = require('../db/index');
 
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 const DATA_DIR = path.resolve(__dirname, '../../data');
@@ -37,32 +38,6 @@ function getDataDir(modelSlug) {
   return dir;
 }
 
-function getProcessedPath(modelSlug) {
-  const dir = path.join(getDataDir(modelSlug), 'processed');
-  fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, 'processed-ids.json');
-}
-
-// processedIds: { dialogId: { msgCount, lastIncoming, timestamp } }
-function loadProcessed(modelSlug) {
-  const fp = getProcessedPath(modelSlug);
-  if (!fs.existsSync(fp)) return {};
-  try {
-    const data = JSON.parse(fs.readFileSync(fp, 'utf8'));
-    // Migration: old format was array of strings
-    if (Array.isArray(data)) {
-      const obj = {};
-      for (const id of data) obj[id] = { msgCount: 0, lastIncoming: '', timestamp: new Date().toISOString() };
-      return obj;
-    }
-    return data;
-  } catch { return {}; }
-}
-
-function saveProcessed(modelSlug, processed) {
-  fs.writeFileSync(getProcessedPath(modelSlug), JSON.stringify(processed, null, 2), 'utf8');
-}
-
 // Approved responses log — builds training data
 function getApprovedLogPath(modelSlug) {
   const dir = path.join(getDataDir(modelSlug), 'training');
@@ -86,45 +61,6 @@ function logApprovedResponse(modelSlug, item, finalText, action) {
     draftType: item.draftType || 'unknown'
   };
   fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf8');
-}
-
-function makeDialogId(item) {
-  return `${item.site}::${item.url}`;
-}
-
-// Active dialogs — we replied, waiting for photographer's response
-function getActiveDialogsPath(modelSlug) {
-  const dir = path.join(getDataDir(modelSlug), 'processed');
-  fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, 'active-dialogs.json');
-}
-
-function loadActiveDialogs(modelSlug) {
-  const fp = getActiveDialogsPath(modelSlug);
-  if (!fs.existsSync(fp)) return [];
-  try { return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch { return []; }
-}
-
-function saveActiveDialogs(modelSlug, dialogs) {
-  fs.writeFileSync(getActiveDialogsPath(modelSlug), JSON.stringify(dialogs, null, 2), 'utf8');
-}
-
-function addActiveDialog(modelSlug, item) {
-  const dialogs = loadActiveDialogs(modelSlug);
-  if (dialogs.some(d => d.url === item.url)) return;
-  dialogs.push({
-    site: item.site,
-    siteLabel: item.siteLabel,
-    photographer: item.photographer,
-    url: item.url,
-    addedAt: new Date().toISOString()
-  });
-  saveActiveDialogs(modelSlug, dialogs);
-}
-
-function removeActiveDialog(modelSlug, url) {
-  const dialogs = loadActiveDialogs(modelSlug);
-  saveActiveDialogs(modelSlug, dialogs.filter(d => d.url !== url));
 }
 
 // Date/time mentions in draft = always needs approval (model needs to plan travel)
@@ -226,6 +162,9 @@ async function runPipelineForModel(modelSlug) {
   const profileId = config.adspower.profileId;
   const modelDir = getModelDir(modelSlug);
 
+  // Migrate JSON → DB on first run (one-time)
+  db.migrateFromJson(modelSlug);
+
   console.log(`[pipeline] Starting scan for ${modelName}...`);
 
   // 1. Extract dialogs from all sites — open browser, extract, close
@@ -240,7 +179,7 @@ async function runPipelineForModel(modelSlug) {
   const allDialogs = [];
 
   try {
-    // Extract from inbox (recent dialogs)
+    // Extract from inbox (recent/unread dialogs)
     for (const siteConfig of config.sites) {
       const extractor = extractors[siteConfig.id];
       if (!extractor) continue;
@@ -255,20 +194,18 @@ async function runPipelineForModel(modelSlug) {
       }
     }
 
-    // Also check active dialogs (qualified ones we replied to, may be in offtop)
-    const activeDialogs = loadActiveDialogs(modelSlug);
+    // Also check active dialogs from DB (queued/sent — may have left inbox)
+    const activeDialogs = db.getActiveDialogs(modelSlug);
     const existingUrls = new Set(allDialogs.map(d => d.url));
 
     for (const active of activeDialogs) {
       if (existingUrls.has(active.url)) continue; // already in inbox results
 
       const siteConfig = config.sites.find(s => s.id === active.site);
-      const extractor = extractors[active.site];
-      if (!siteConfig || !extractor) continue;
+      if (!siteConfig) continue;
 
       try {
-        // Extract single dialog by URL
-        console.log(`[pipeline] 🔍 Перевіряю активний діалог: ${active.photographer} (${active.siteLabel})`);
+        console.log(`[pipeline] 🔍 Перевіряю активний діалог: ${active.photographer} (${active.site})`);
         const dialog = await extractSingleDialogByUrl(session.page, active, siteConfig, modelName);
         if (dialog) allDialogs.push(dialog);
       } catch (err) {
@@ -281,8 +218,6 @@ async function runPipelineForModel(modelSlug) {
 
   // 2. Filter: only dialogs where last message is from photographer (not us)
   //    AND either never seen or photographer sent new messages
-  const processed = loadProcessed(modelSlug);
-
   const newItems = allDialogs.filter(item => {
     const msgs = item.messages || [];
     if (msgs.length === 0) return false;
@@ -290,19 +225,30 @@ async function runPipelineForModel(modelSlug) {
     // Skip if last message is ours — we already replied
     const lastMsg = msgs[msgs.length - 1];
     if (lastMsg.role === 'self') {
+      // Update status to 'sent' if it was 'queued'
+      const existing = db.getDialog(item.site, item.url);
+      if (existing && existing.status === 'queued') {
+        db.updateStatus(item.site, item.url, 'sent');
+      }
       console.log(`[pipeline] ⏩ ${item.photographer}: останнє смс наше, скіп`);
       return false;
     }
 
-    const id = makeDialogId(item);
-    const prev = processed[id];
-    if (!prev) return true; // never seen
-
-    // Check if photographer sent new messages since we last processed
     const lastIncoming = item.lastIncoming || '';
     const msgCount = msgs.filter(m => m.role === 'interlocutor').length;
 
-    if (lastIncoming !== prev.lastIncoming || msgCount > prev.msgCount) {
+    // Check DB for previous state
+    const prev = db.getDialog(item.site, item.url);
+
+    if (!prev) return true; // never seen — new dialog
+
+    // Update photographer name if it changed (extraction improvements)
+    if (item.photographer && item.photographer !== prev.photographer) {
+      db.updatePhotographer(item.site, item.url, item.photographer);
+    }
+
+    // Check if photographer sent new messages since we last processed
+    if (lastIncoming !== prev.last_incoming || msgCount > prev.msg_count) {
       console.log(`[pipeline] 🔄 Нове повідомлення від ${item.photographer}: "${lastIncoming.slice(0, 60)}"`);
       return true;
     }
@@ -320,8 +266,8 @@ async function runPipelineForModel(modelSlug) {
   for (const item of newItems) {
     try {
       // Check if this is an active dialog (we already replied before)
-      const activeDialogs = loadActiveDialogs(modelSlug);
-      const isActive = activeDialogs.some(d => d.url === item.url || d.photographer === item.photographer);
+      const existing = db.getDialog(item.site, item.url);
+      const isActive = existing && (existing.status === 'sent' || existing.status === 'queued');
 
       if (isActive) {
         // Active dialog — skip Grok qualification, go straight to draft
@@ -336,12 +282,13 @@ async function runPipelineForModel(modelSlug) {
 
         if (!q.qualified) {
           console.log(`[pipeline] ❌ ${item.photographer} (${item.siteLabel}): ${q.reason}`);
-          processed[makeDialogId(item)] = {
-            msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
+          db.upsertDialog({
+            site: item.site, url: item.url,
+            photographer: item.photographer, modelSlug,
+            status: 'rejected',
             lastIncoming: item.lastIncoming || '',
-            timestamp: new Date().toISOString()
-          };
-          saveProcessed(modelSlug, processed);
+            msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length
+          });
           continue;
         }
 
@@ -365,18 +312,18 @@ async function runPipelineForModel(modelSlug) {
       const added = addToQueue(item);
       if (added) {
         console.log(`[pipeline] 📋 Queued: ${item.photographer} (${item.siteLabel}) — ${item.draftType}`);
-        // Track as active dialog — check every scan until resolved
-        addActiveDialog(modelSlug, item);
       } else {
         console.log(`[pipeline] Already in queue: ${item.photographer}`);
       }
 
-      processed[makeDialogId(item)] = {
-        msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length,
+      // Save to DB — status 'queued' (active, will be checked every scan)
+      db.upsertDialog({
+        site: item.site, url: item.url,
+        photographer: item.photographer, modelSlug,
+        status: 'queued',
         lastIncoming: item.lastIncoming || '',
-        timestamp: new Date().toISOString()
-      };
-      saveProcessed(modelSlug, processed);
+        msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length
+      });
     } catch (err) {
       console.error(`[pipeline] Error processing ${item.photographer}: ${err.message}`);
     }

@@ -39,7 +39,7 @@ async function processSendQueue() {
     await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text, toSend.mediaFiles || []);
     console.log(`[scheduler] ✅ Надіслано: ${toSend.photographer} (${toSend.site})`);
     const { onDeliveryResult } = require('../bot/index');
-    onDeliveryResult(true, toSend.photographer, toSend.site);
+    onDeliveryResult(true, toSend.photographer, toSend.site, null, toSend.url);
   } catch (err) {
     console.error(`[scheduler] ❌ Помилка відправки ${toSend.photographer}: ${err.message}`);
     const { onDeliveryResult } = require('../bot/index');

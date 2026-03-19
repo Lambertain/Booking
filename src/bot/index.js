@@ -6,6 +6,7 @@ const { formatApprovalCard, buildApprovalKeyboard, collectPhotographerImages } =
 const { chat: agentChat } = require('../ai/agent');
 const { takeNext, queueLength } = require('../pipeline/queue');
 const { addToSendQueue } = require('../pipeline/send-queue');
+const db = require('../db/index');
 const { recordShoot, setAirtableBase } = require('../airtable/index');
 const { extractShootDetails } = require('../ai/grok');
 
@@ -28,9 +29,11 @@ let queueLock = false;
 let editMediaFiles = [];  // collected media during EDIT mode
 
 // --- Called by scheduler after delivery attempt ---
-function onDeliveryResult(success, photographer, site, error) {
+function onDeliveryResult(success, photographer, site, error, url) {
   if (success) {
     bot.api.sendMessage(CHAT_ID, `✅ Відповідь доставлена: ${photographer} (${site})`).catch(() => {});
+    // Update DB: dialog is now 'sent' (awaiting photographer's response)
+    if (url) db.updateStatus(site, url, 'sent');
     waitingForDelivery = false;
     // Queue processor will pick next in 10s
   } else {
