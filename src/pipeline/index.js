@@ -156,22 +156,19 @@ async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
   }
 
   if (active.site === 'purpleport') {
-    // Re-extract via the main extractor for single URL
-    const selfPattern = siteConfig.selfProfilePattern || modelName;
+    const selfPattern = siteConfig.selfProfilePattern || '';
     const dialog = await page.evaluate((selfPat) => {
-      const containers = document.querySelectorAll(
-        '.message, .msg, [class*="message"], [class*="thread"] > div, .conversation-message'
-      );
-      const messages = [];
-      for (const el of containers) {
-        const text = (el.innerText || '').trim();
-        if (!text || text.length < 5) continue;
-        const isSelf = el.classList.contains('sent') ||
-          el.classList.contains('outgoing') ||
-          el.classList.contains('mine') ||
-          (el.querySelector('a[href]')?.textContent || '').toLowerCase().includes(selfPat.toLowerCase());
-        messages.push({ role: isSelf ? 'self' : 'interlocutor', text: text.slice(0, 2000) });
-      }
+      const contentBlocks = [...document.querySelectorAll('div.message div.content')];
+      const messages = contentBlocks.map(block => {
+        const authorLink = block.querySelector('a.portlink');
+        const authorName = (authorLink?.textContent || '').trim();
+        const authorHref = authorLink?.getAttribute('href') || '';
+        const textDiv = block.querySelector('div');
+        const text = (textDiv?.innerText || '').trim();
+        const isSelf = authorName === 'Me' ||
+          (selfPat && authorHref.toLowerCase().includes(selfPat.toLowerCase()));
+        return { role: isSelf ? 'self' : 'interlocutor', text };
+      }).filter(m => m.text);
       return { messages };
     }, selfPattern);
 

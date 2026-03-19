@@ -5,13 +5,11 @@ async function collectInboxLinks(page, siteConfig) {
   await page.waitForTimeout(5000);
 
   const urls = await page.evaluate(() => {
-    // Find message thread links
-    const links = [...document.querySelectorAll('a[href*="/account/messages/"], a[href*="/message/"]')]
-      .map(a => ({ href: a.href, text: (a.textContent || '').trim() }))
-      .filter(x => x.href && !x.href.endsWith('/messages/'));
-    // Deduplicate
-    const seen = new Set();
-    return links.filter(x => { if (seen.has(x.href)) return false; seen.add(x.href); return true; }).slice(0, 22);
+    return [...new Set(
+      [...document.querySelectorAll('a[href*="viewmessage.asp"]')]
+        .map(a => a.href)
+        .filter(Boolean)
+    )].slice(0, 22);
   });
 
   console.log(`  purpleport: found ${urls.length} inbox links`);
@@ -19,40 +17,39 @@ async function collectInboxLinks(page, siteConfig) {
 }
 
 async function extract(page, siteConfig, modelName) {
-  const inboxLinks = await collectInboxLinks(page, siteConfig);
-  const selfPattern = siteConfig.selfProfilePattern || modelName;
+  const inboxUrls = await collectInboxLinks(page, siteConfig);
+  const selfPattern = siteConfig.selfProfilePattern || '';
   const results = [];
 
-  for (const link of inboxLinks) {
+  for (const url of inboxUrls) {
     try {
-      await page.goto(link.href, { waitUntil: 'domcontentloaded' });
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(3000);
 
       const dialog = await page.evaluate((selfPat) => {
-        // Generic extraction: find message containers
-        // Will be refined after DOM dump
-        const messages = [];
-        const photographer = '';
+        // Each message is a div.content inside div.message
+        const contentBlocks = [...document.querySelectorAll('div.message div.content')];
+        let photographer = '';
 
-        // Try common patterns for message threads
-        const containers = document.querySelectorAll(
-          '.message, .msg, [class*="message"], [class*="thread"] > div, .conversation-message'
-        );
+        const messages = contentBlocks.map(block => {
+          const authorLink = block.querySelector('a.portlink');
+          const authorHref = authorLink?.getAttribute('href') || '';
+          const authorName = (authorLink?.textContent || '').trim();
+          const textDiv = block.querySelector('div');
+          const text = (textDiv?.innerText || '').trim();
 
-        for (const el of containers) {
-          const text = (el.innerText || '').trim();
-          if (!text || text.length < 5) continue;
+          // Self = "Me" text or selfProfilePattern in href
+          const isSelf = authorName === 'Me' ||
+            (selfPat && authorHref.toLowerCase().includes(selfPat.toLowerCase()));
 
-          // Try to detect self vs interlocutor
-          const isSelf = el.classList.contains('sent') ||
-            el.classList.contains('outgoing') ||
-            el.classList.contains('mine') ||
-            (el.querySelector('a[href]')?.textContent || '').toLowerCase().includes(selfPat.toLowerCase());
+          if (!isSelf && !photographer && authorName) {
+            photographer = authorName;
+          }
 
-          messages.push({ role: isSelf ? 'self' : 'interlocutor', text: text.slice(0, 2000) });
-        }
+          return { role: isSelf ? 'self' : 'interlocutor', text };
+        }).filter(m => m.text);
 
-        return { messages, photographer, url: location.href };
+        return { messages, photographer };
       }, selfPattern);
 
       if (dialog.messages.length === 0) continue;
@@ -63,14 +60,14 @@ async function extract(page, siteConfig, modelName) {
         site: 'purpleport',
         siteLabel: 'PurplePort',
         model: modelName,
-        photographer: dialog.photographer || link.text || 'Unknown',
-        url: link.href,
+        photographer: dialog.photographer || 'Unknown',
+        url,
         language: detectLanguage(lastIncoming.text),
         messages: dialog.messages,
         lastIncoming: lastIncoming.text
       });
     } catch (err) {
-      console.error(`purpleport extract error for ${link.href}: ${err.message}`);
+      console.error(`purpleport extract error for ${url}: ${err.message}`);
     }
   }
 
