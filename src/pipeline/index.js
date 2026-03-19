@@ -89,7 +89,7 @@ function logApprovedResponse(modelSlug, item, finalText, action) {
 }
 
 function makeDialogId(item) {
-  return `${item.site}::${item.photographer}::${item.url}`;
+  return `${item.site}::${item.url}`;
 }
 
 // Active dialogs — we replied, waiting for photographer's response

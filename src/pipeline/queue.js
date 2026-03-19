@@ -23,9 +23,9 @@ function saveQueue(queue) {
 
 function addToQueue(item) {
   const queue = loadQueue();
-  // Avoid duplicates
-  const id = `${item.site}::${item.photographer}::${item.url}`;
-  if (queue.some(q => `${q.site}::${q.photographer}::${q.url}` === id)) return false;
+  // Avoid duplicates by site + url (photographer name can change)
+  const id = `${item.site}::${item.url}`;
+  if (queue.some(q => `${q.site}::${q.url}` === id)) return false;
   item.queuedAt = new Date().toISOString();
   queue.push(item);
   saveQueue(queue);
