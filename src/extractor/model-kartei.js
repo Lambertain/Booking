@@ -86,7 +86,8 @@ async function extractSingleDialog(page, sel, url) {
     return { messages, photographer };
   }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf, otherSel: sel.messageAuthorOther });
 
-  return { url, photographer: result.photographer, messages: result.messages };
+  // Model-Kartei shows messages newest-first, reverse to chronological order
+  return { url, photographer: result.photographer, messages: result.messages.reverse() };
 }
 
 async function extract(page, siteConfig, modelName) {

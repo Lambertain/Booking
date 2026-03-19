@@ -154,6 +154,9 @@ async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
       }).filter(m => m.text);
     }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf });
 
+    // Model-Kartei shows messages newest-first, reverse to chronological order
+    messages.reverse();
+
     if (messages.length === 0) return null;
     const lastIncoming = [...messages].reverse().find(m => m.role === 'interlocutor');
     if (!lastIncoming) return null;
