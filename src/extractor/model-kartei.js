@@ -73,22 +73,18 @@ async function extractSingleDialog(page, sel, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
 
-  const result = await page.evaluate(({ rowSel, textSel, selfSel }) => {
+  const result = await page.evaluate(({ rowSel, textSel, selfSel, otherSel }) => {
     const rows = [...document.querySelectorAll(rowSel)];
-    let photographer = '';
     const messages = rows.map(row => {
       const text = (row.querySelector(textSel)?.innerText || '').trim();
       const isSelf = row.matches(selfSel) || row.className.includes('sedcard1');
-      // Get photographer name from first interlocutor message block
-      if (!isSelf && !photographer) {
-        // Try: username link, any link with text, bold text, or first text node in the header area
-        const nameEl = row.querySelector('a.username, .username, a[href*="/sedcards/"], a[href*="/portfolios/"]');
-        if (nameEl) photographer = nameEl.textContent.trim();
-      }
       return { role: isSelf ? 'self' : 'interlocutor', text };
     });
+    // Photographer name from the interlocutor's message block (sedcard2)
+    const otherBlock = document.querySelector(otherSel);
+    const photographer = otherBlock?.querySelector('.username')?.textContent?.trim() || '';
     return { messages, photographer };
-  }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf });
+  }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf, otherSel: sel.messageAuthorOther });
 
   return { url, photographer: result.photographer, messages: result.messages };
 }
