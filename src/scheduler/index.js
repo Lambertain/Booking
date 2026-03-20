@@ -42,11 +42,25 @@ async function processSendQueue() {
     onDeliveryResult(true, toSend.photographer, toSend.site, null, toSend.url);
   } catch (err) {
     console.error(`[scheduler] ❌ Помилка відправки ${toSend.photographer}: ${err.message}`);
-    const { onDeliveryResult } = require('../bot/index');
-    onDeliveryResult(false, toSend.photographer, toSend.site, err.message);
-    const { addToSendQueue } = require('../pipeline/send-queue');
-    addToSendQueue(toSend);
-    sendPaused = true;
+    // Auto-retry once after 30s before pausing
+    const retryCount = toSend._retryCount || 0;
+    if (retryCount < 1) {
+      console.log(`[scheduler] 🔄 Авто-retry через 30с...`);
+      toSend._retryCount = retryCount + 1;
+      const { addToSendQueue } = require('../pipeline/send-queue');
+      addToSendQueue(toSend);
+      const { onDeliveryResult } = require('../bot/index');
+      onDeliveryResult(false, toSend.photographer, toSend.site, `${err.message} (retry через 30с)`);
+      await new Promise(r => setTimeout(r, 30000));
+      // Try again immediately
+      try { await processSendQueue(); } catch {}
+    } else {
+      const { onDeliveryResult } = require('../bot/index');
+      onDeliveryResult(false, toSend.photographer, toSend.site, err.message);
+      const { addToSendQueue } = require('../pipeline/send-queue');
+      addToSendQueue(toSend);
+      sendPaused = true;
+    }
   }
 }
 
@@ -137,6 +151,8 @@ function startScheduler() {
 function resumeSending() {
   sendPaused = false;
   console.log('[scheduler] Відправку відновлено');
+  // Immediately try to send instead of waiting for next scan
+  setTimeout(() => triggerSend(), 1000);
 }
 
 module.exports = { startScheduler, triggerSend, resumeSending };
