@@ -70,12 +70,12 @@ Follow these guidelines strictly:
 ${profile}
 
 IMPORTANT RULES:
-- Reply in the photographer's language
+- ALWAYS reply in English regardless of the photographer's language
 - Keep it short (2-6 sentences)
 - Be polite and businesslike
 - If booking details are missing, ask for: date, time, duration, shooting level, location
 - Do NOT invent availability, rates, or promises
-- Sign off with "Best regards, ${modelName.split(' ')[0]}" or equivalent in their language
+- Sign off with "Best regards, ${modelName.split(' ')[0]}"
 - Output ONLY the reply text, nothing else
 
 `;
@@ -336,4 +336,34 @@ Respond with ONLY a valid JSON object, no markdown, no explanation:
   }
 }
 
-module.exports = { generateDraft, qualifyDialog, classifyDraft, extractShootDetails };
+async function translateToEnglish(text) {
+  if (!text || text.length < 5) return null;
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: 'Translate the following text to English. Output ONLY the translation, nothing else. If the text is already in English, output it as-is.' },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.0,
+        max_tokens: 500
+      })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.choices?.[0]?.message?.content || '').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { generateDraft, qualifyDialog, classifyDraft, extractShootDetails, translateToEnglish };

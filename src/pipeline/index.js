@@ -5,7 +5,7 @@ const modelKartei = require('../extractor/model-kartei');
 const adultfolio = require('../extractor/adultfolio');
 const modelmayhem = require('../extractor/modelmayhem');
 const purpleport = require('../extractor/purpleport');
-const { generateDraft, qualifyDialog, classifyDraft, extractShootDetails } = require('../ai/grok');
+const { generateDraft, qualifyDialog, classifyDraft, extractShootDetails, translateToEnglish } = require('../ai/grok');
 const { addToQueue } = require('./queue');
 const { sendReply } = require('../extractor/sender');
 const { recordShoot } = require('../airtable/index');
@@ -332,6 +332,12 @@ async function runPipelineForModel(modelSlug) {
         item.photographer, item.language
       );
       item.draft = draft;
+
+      // Translate incoming to English if needed
+      if (item.language && item.language !== 'en') {
+        const translated = await translateToEnglish(item.lastIncoming);
+        if (translated) item.lastIncomingEn = translated;
+      }
 
       // Classify draft type
       const draftType = await classifyDraft(modelDir, draft, item.messages, item.photographer);

@@ -3,13 +3,26 @@ function formatApprovalCard(item) {
     `📸 *${escapeMarkdown(item.photographer || 'Unknown')}*`,
     `🌐 ${escapeMarkdown(item.siteLabel)}`,
     `👤 ${escapeMarkdown(item.model)}`,
-    '',
-    '💬 *Incoming:*',
-    escapeMarkdown(truncate(item.lastIncoming, 500)),
-    '',
-    '✏️ *Draft:*',
-    escapeMarkdown(truncate(item.draft, 800))
+    ''
   ];
+
+  // Show translated incoming if available, original below
+  if (item.lastIncomingEn && item.lastIncomingEn !== item.lastIncoming) {
+    lines.push(
+      '💬 *Incoming \\(translated\\):*',
+      escapeMarkdown(truncate(item.lastIncomingEn, 500)),
+      '',
+      `_Original \\(${escapeMarkdown(item.language || '?')}\\):_`,
+      `_${escapeMarkdown(truncate(item.lastIncoming, 300))}_`
+    );
+  } else {
+    lines.push(
+      '💬 *Incoming:*',
+      escapeMarkdown(truncate(item.lastIncoming, 500))
+    );
+  }
+
+  lines.push('', '✏️ *Draft:*', escapeMarkdown(truncate(item.draft, 800)));
   return lines.join('\n');
 }
 
