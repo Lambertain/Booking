@@ -282,6 +282,19 @@ async function runPipelineForModel(modelSlug) {
       console.log(`[pipeline] 🔄 Нове повідомлення від ${item.photographer}: "${lastIncoming.slice(0, 60)}"`);
       return true;
     }
+
+    // Recover lost queued dialogs — if status is 'queued' but not in approval queue,
+    // it was lost during a restart. Re-process it.
+    if (prev.status === 'queued') {
+      const { loadQueue } = require('./queue');
+      const queue = loadQueue();
+      const inQueue = queue.some(q => q.site === item.site && q.url === item.url);
+      if (!inQueue) {
+        console.log(`[pipeline] 🔁 Відновлюю втрачений діалог: ${item.photographer} (${item.siteLabel})`);
+        return true;
+      }
+    }
+
     return false;
   });
 
