@@ -157,7 +157,9 @@ QUALIFIED means the photographer:
 - Wants to book or discuss a paid shoot
 - Asks about rates, dates, location, shooting level
 - Shows real intent to collaborate for money
-- Proposes concrete shooting details
+- Proposes concrete shooting details (genre, duration, city, dates)
+- Says they are ready/interested/available for a shoot
+- Responds positively to the model's offer (even briefly like "ok", "ready", "interested", "let's do it")
 
 NOT QUALIFIED means:
 - Explicit refusal ("not interested", "no time", "can't afford", "stopped shooting")
@@ -174,7 +176,7 @@ QUALIFIED: <reason>
 or
 NOT_QUALIFIED: <reason>
 
-Be strict. When in doubt, mark as NOT_QUALIFIED.`;
+IMPORTANT: When in doubt, mark as QUALIFIED — it's better to show a dialog to the manager than to miss a potential booking.`;
 
   const res = await fetch(API_URL, {
     method: 'POST',
