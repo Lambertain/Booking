@@ -209,7 +209,30 @@ async function runPipelineForModel(modelSlug) {
   const allDialogs = [];
 
   try {
-    // Extract from inbox (recent/unread dialogs)
+    // 1a. FIRST: check active dialogs from DB (queued/sent — priority, may have left inbox)
+    const activeDialogs = db.getActiveDialogs(modelSlug);
+    const activeUrls = new Set();
+
+    if (activeDialogs.length > 0) {
+      console.log(`[pipeline] 🔄 Перевіряю ${activeDialogs.length} активних діалогів з БД...`);
+      for (const active of activeDialogs) {
+        const siteConfig = config.sites.find(s => s.id === active.site);
+        if (!siteConfig) continue;
+
+        try {
+          const dialog = await extractSingleDialogByUrl(session.page, active, siteConfig, modelName);
+          if (dialog) {
+            allDialogs.push(dialog);
+            activeUrls.add(active.url);
+            console.log(`[pipeline] 🔍 ${active.photographer} (${active.site}): OK`);
+          }
+        } catch (err) {
+          console.error(`[pipeline] Active dialog check failed for ${active.photographer}: ${err.message}`);
+        }
+      }
+    }
+
+    // 1b. Then extract from inbox (recent/unread dialogs)
     for (const siteConfig of config.sites) {
       const extractor = extractors[siteConfig.id];
       if (!extractor) continue;
@@ -217,29 +240,12 @@ async function runPipelineForModel(modelSlug) {
       try {
         console.log(`[pipeline] Extracting from ${siteConfig.label}...`);
         const dialogs = await extractor.extract(session.page, siteConfig, modelName);
-        console.log(`[pipeline] ${siteConfig.label}: ${dialogs.length} dialogs extracted`);
-        allDialogs.push(...dialogs);
+        // Skip dialogs already checked from DB
+        const newDialogs = dialogs.filter(d => !activeUrls.has(d.url));
+        console.log(`[pipeline] ${siteConfig.label}: ${dialogs.length} extracted, ${newDialogs.length} new`);
+        allDialogs.push(...newDialogs);
       } catch (err) {
         console.error(`[pipeline] ${siteConfig.label} extraction failed: ${err.message}`);
-      }
-    }
-
-    // Also check active dialogs from DB (queued/sent — may have left inbox)
-    const activeDialogs = db.getActiveDialogs(modelSlug);
-    const existingUrls = new Set(allDialogs.map(d => d.url));
-
-    for (const active of activeDialogs) {
-      if (existingUrls.has(active.url)) continue; // already in inbox results
-
-      const siteConfig = config.sites.find(s => s.id === active.site);
-      if (!siteConfig) continue;
-
-      try {
-        console.log(`[pipeline] 🔍 Перевіряю активний діалог: ${active.photographer} (${active.site})`);
-        const dialog = await extractSingleDialogByUrl(session.page, active, siteConfig, modelName);
-        if (dialog) allDialogs.push(dialog);
-      } catch (err) {
-        console.error(`[pipeline] Active dialog check failed for ${active.photographer}: ${err.message}`);
       }
     }
   } finally {
