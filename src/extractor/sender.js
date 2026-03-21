@@ -1,8 +1,8 @@
+const fs = require('fs');
 const { openPage } = require('./adspower');
 
 async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFiles = []) {
   const session = await openPage(profileId);
-  // Open new tab to avoid conflicts with existing tabs
   const page = await session.context.newPage();
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -14,35 +14,33 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
 
     // Fill text only if provided
     if (message && message.trim()) {
-    const editor = page.locator(rf.editorSelector).first();
-    await editor.click();
-    await page.evaluate(({ message, editorSel, textareaSel }) => {
-      const editor = document.querySelector(editorSel);
-      if (editor) {
-        editor.innerHTML = '';
-        message.split('\n').forEach(line => {
-          const div = document.createElement('div');
-          div.textContent = line;
-          editor.appendChild(div);
-        });
-        editor.dispatchEvent(new Event('input', { bubbles: true }));
-        editor.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      const ta = document.querySelector(textareaSel);
-      if (ta) {
-        ta.value = message;
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
-        ta.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }, { message, editorSel: rf.editorSelector, textareaSel: rf.textareaSelector });
-    } // end if (message)
+      const editor = page.locator(rf.editorSelector).first();
+      await editor.click();
+      await page.evaluate(({ message, editorSel, textareaSel }) => {
+        const editor = document.querySelector(editorSel);
+        if (editor) {
+          editor.innerHTML = '';
+          message.split('\n').forEach(line => {
+            const div = document.createElement('div');
+            div.textContent = line;
+            editor.appendChild(div);
+          });
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          editor.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        const ta = document.querySelector(textareaSel);
+        if (ta) {
+          ta.value = message;
+          ta.dispatchEvent(new Event('input', { bubbles: true }));
+          ta.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, { message, editorSel: rf.editorSelector, textareaSel: rf.textareaSelector });
+    }
 
     if (mediaFiles.length > 0) {
-      const fs = require('fs');
       const existing = mediaFiles.filter(f => fs.existsSync(f));
       console.log(`[sender] Media files: ${mediaFiles.length} total, ${existing.length} exist`);
       if (existing.length > 0) {
-        // Click into editor first
         await page.locator(rf.editorSelector).first().click();
         await page.waitForTimeout(1000);
 
@@ -61,7 +59,7 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
             const editor = document.querySelector('div.note-editable.panel-body');
             editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
           }, b64);
-          await page.waitForTimeout(3000); // wait for adultfolio to upload
+          await page.waitForTimeout(3000);
         }
 
         const imgCount = await page.evaluate((sel) => {
@@ -71,9 +69,8 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
       }
     }
 
-    // Don't submit if nothing to send
     const hasText = message && message.trim();
-    const hasMedia = mediaFiles.length > 0 && require('fs').existsSync(mediaFiles[0]);
+    const hasMedia = mediaFiles.length > 0 && fs.existsSync(mediaFiles[0]);
     if (!hasText && !hasMedia) {
       console.error('[sender] Nothing to send — skipping submit');
       return { ok: false, url, reason: 'empty message and no media' };
@@ -95,13 +92,11 @@ async function sendModelMayhemReply(profileId, siteConfig, url, message) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(5000);
 
-    // Fill reply textarea
     const textarea = page.locator('textarea#AreaReplyMessage');
     if (await textarea.count() === 0) throw new Error('Reply textarea not found');
     await textarea.fill(message);
     await page.waitForTimeout(500);
 
-    // Click Reply button
     const replyBtn = page.locator('input[type="submit"][value="Reply"]');
     if (await replyBtn.count() === 0) throw new Error('Reply button not found');
     await replyBtn.click();
@@ -113,7 +108,7 @@ async function sendModelMayhemReply(profileId, siteConfig, url, message) {
   }
 }
 
-async function sendModelKarteiReply(profileId, siteConfig, url, message) {
+async function sendModelKarteiReply(profileId, siteConfig, url, message, mediaFiles = []) {
   const session = await openPage(profileId);
   const page = await session.context.newPage();
   try {
@@ -125,10 +120,71 @@ async function sendModelKarteiReply(profileId, siteConfig, url, message) {
     await textarea.fill(message);
     await page.waitForTimeout(500);
 
+    // Attach media files via file input if available
+    if (mediaFiles.length > 0) {
+      const existing = mediaFiles.filter(f => fs.existsSync(f));
+      if (existing.length > 0) {
+        const fileInput = page.locator('input#pnMsgFile');
+        if (await fileInput.count() > 0) {
+          // Model-Kartei accepts one file at a time, use the first one
+          await fileInput.setInputFiles(existing[0]);
+          console.log(`[sender] Model-Kartei: attached file ${existing[0]}`);
+          await page.waitForTimeout(1000);
+        }
+      }
+    }
+
     const sendBtn = page.locator('form#pnSendForm button[type="submit"]');
     if (await sendBtn.count() === 0) throw new Error('Send button not found');
     await sendBtn.click();
     await page.waitForTimeout(5000);
+
+    return { ok: true, url };
+  } finally {
+    await session.close();
+  }
+}
+
+async function sendPurplePortReply(profileId, siteConfig, url, message) {
+  const session = await openPage(profileId);
+  const page = await session.context.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(5000);
+
+    // PurplePort uses TinyMCE editor
+    const formExists = await page.locator('form#message').count();
+    if (!formExists) throw new Error('Reply form #message not found on page');
+
+    // Set content via TinyMCE API
+    const editorSet = await page.evaluate((msg) => {
+      if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+        const html = msg.split('\n').map(l => `<p>${l}</p>`).join('');
+        tinymce.activeEditor.setContent(html);
+        return true;
+      }
+      // Fallback: fill textarea directly
+      const ta = document.querySelector('textarea#content');
+      if (ta) {
+        ta.value = msg;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      }
+      return false;
+    }, message);
+
+    if (!editorSet) throw new Error('Could not set message content (TinyMCE or textarea)');
+    await page.waitForTimeout(1000);
+
+    // Submit the form
+    await page.evaluate(() => {
+      // Sync TinyMCE to textarea before submit
+      if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+        tinymce.activeEditor.save();
+      }
+      document.querySelector('form#message').submit();
+    });
+    await page.waitForTimeout(6000);
 
     return { ok: true, url };
   } finally {
@@ -145,7 +201,10 @@ async function sendReply(profileId, siteConfig, url, message, mediaFiles = []) {
     return sendModelMayhemReply(profileId, siteConfig, url, message);
   }
   if (siteId === 'model-kartei') {
-    return sendModelKarteiReply(profileId, siteConfig, url, message);
+    return sendModelKarteiReply(profileId, siteConfig, url, message, mediaFiles);
+  }
+  if (siteId === 'purpleport') {
+    return sendPurplePortReply(profileId, siteConfig, url, message);
   }
   throw new Error(`Sending not yet implemented for site: ${siteId}`);
 }
