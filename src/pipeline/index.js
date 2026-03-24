@@ -139,9 +139,10 @@ async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
         const name = (sb.innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
         const text = (textNodes[i]?.innerText || '').trim();
         const isSelf = link.includes('/' + selfProfileId) || name.toLowerCase() === selfName.toLowerCase();
-        return { role: isSelf ? 'self' : 'interlocutor', text };
+        return { role: isSelf ? 'self' : 'interlocutor', text, senderName: name };
       }).filter(m => m.text);
-      return { url: location.href, messages };
+      const photographer = messages.find(m => m.role === 'interlocutor')?.senderName || '';
+      return { url: location.href, messages, photographer };
     }, { selfProfileId, selfName: modelName });
 
     if (dialog.messages.length === 0) return null;
@@ -150,7 +151,7 @@ async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
 
     return {
       site: 'modelmayhem', siteLabel: 'Model Mayhem', model: modelName,
-      photographer: active.photographer, url: active.url,
+      photographer: dialog.photographer || active.photographer, url: active.url,
       language: detectLanguage(lastIncoming.text), messages: dialog.messages, lastIncoming: lastIncoming.text
     };
   }
@@ -289,13 +290,14 @@ async function runPipelineForModel(modelSlug) {
       return true;
     }
 
-    // Recover lost queued dialogs — if status is 'queued' but not in approval queue,
-    // it was lost during a restart. Re-process it.
+    // Recover lost queued dialogs — if status is 'queued' but not in approval queue
+    // AND not in send queue (approved but pending delivery), it was truly lost.
     if (prev.status === 'queued') {
       const { loadQueue } = require('./queue');
-      const queue = loadQueue();
-      const inQueue = queue.some(q => q.site === item.site && q.url === item.url);
-      if (!inQueue) {
+      const { loadSendQueue } = require('./send-queue');
+      const inApprovalQueue = loadQueue().some(q => q.site === item.site && q.url === item.url);
+      const inSendQueue = loadSendQueue().some(q => q.site === item.site && q.url === item.url);
+      if (!inApprovalQueue && !inSendQueue) {
         console.log(`[pipeline] 🔁 Відновлюю втрачений діалог: ${item.photographer} (${item.siteLabel})`);
         return true;
       }

@@ -33,4 +33,4 @@ function sendQueueLength() {
   return loadSendQueue().length;
 }
 
-module.exports = { addToSendQueue, takeSendNext, sendQueueLength };
+module.exports = { addToSendQueue, takeSendNext, sendQueueLength, loadSendQueue };

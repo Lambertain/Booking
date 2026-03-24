@@ -53,12 +53,22 @@ function startQueueProcessor() {
     const item = takeNext();
     if (!item) { queueLock = false; return; }
 
-    // Skip if already sent with the same last message (stale queue after restart)
+    // Skip stale items: already sent with same message, or still queued but in send queue
     const existing = db.getDialog(item.site, item.url);
-    if (existing && existing.status === 'sent' && existing.last_incoming === item.lastIncoming) {
-      console.log(`[bot] Пропускаю вже відправлений: ${item.photographer} (${item.siteLabel})`);
-      queueLock = false;
-      return;
+    if (existing && existing.last_incoming === item.lastIncoming) {
+      if (existing.status === 'sent') {
+        console.log(`[bot] Пропускаю вже відправлений: ${item.photographer} (${item.siteLabel})`);
+        queueLock = false;
+        return;
+      }
+      if (existing.status === 'queued') {
+        const { loadSendQueue } = require('../pipeline/send-queue');
+        if (loadSendQueue().some(q => q.site === item.site && q.url === item.url)) {
+          console.log(`[bot] Пропускаю — вже у черзі відправки: ${item.photographer} (${item.siteLabel})`);
+          queueLock = false;
+          return;
+        }
+      }
     }
 
     currentApproval = item;
