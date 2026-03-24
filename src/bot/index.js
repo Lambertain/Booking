@@ -53,6 +53,14 @@ function startQueueProcessor() {
     const item = takeNext();
     if (!item) { queueLock = false; return; }
 
+    // Skip if already sent with the same last message (stale queue after restart)
+    const existing = db.getDialog(item.site, item.url);
+    if (existing && existing.status === 'sent' && existing.last_incoming === item.lastIncoming) {
+      console.log(`[bot] Пропускаю вже відправлений: ${item.photographer} (${item.siteLabel})`);
+      queueLock = false;
+      return;
+    }
+
     currentApproval = item;
     currentApproval.approvalId = `${item.site}-${Date.now()}`;
     waitingForEdit = false;
