@@ -135,10 +135,18 @@ async function extractSingleDialogByUrl(page, active, siteConfig, modelName) {
       const senderBoxes = [...document.querySelectorAll('.SenderBox')];
       const textNodes = [...document.querySelectorAll('.MessagesSection .text')];
       const messages = senderBoxes.map((sb, i) => {
-        const link = sb.querySelector('a[href^="/"]')?.getAttribute('href') || '';
-        const name = (sb.innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+        const allAs = [...sb.querySelectorAll('a')];
+        const profileA = allAs.find(a =>
+          (a.getAttribute('href') || '').match(/^\/\d+/) ||
+          (a.href || '').match(/modelmayhem\.com\/\d+/)
+        );
+        const link = profileA?.href || '';
+        const namedA = allAs.find(a => (a.innerText || a.textContent || '').trim());
+        const name = (namedA?.innerText || namedA?.textContent || '').trim() ||
+          (sb.innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
         const text = (textNodes[i]?.innerText || '').trim();
-        const isSelf = link.includes('/' + selfProfileId) || name.toLowerCase() === selfName.toLowerCase();
+        const isSelf = (selfProfileId && link.includes('/' + selfProfileId)) ||
+          name.toLowerCase() === selfName.toLowerCase();
         return { role: isSelf ? 'self' : 'interlocutor', text, senderName: name };
       }).filter(m => m.text);
       const photographer = messages.find(m => m.role === 'interlocutor')?.senderName || '';

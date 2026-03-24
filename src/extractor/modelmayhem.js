@@ -86,10 +86,21 @@ async function extractDialog(page, href, selfProfileId, selfName) {
     const textNodes = [...document.querySelectorAll('.MessagesSection .text')];
 
     const messages = senderBoxes.map((senderBox, i) => {
-      const senderLink = senderBox.querySelector('a[href^="/"]')?.getAttribute('href') || '';
-      const senderName = (senderBox.innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+      const allAs = [...senderBox.querySelectorAll('a')];
+      // Find profile link (relative /NNN or absolute modelmayhem.com/NNN)
+      const profileA = allAs.find(a =>
+        (a.getAttribute('href') || '').match(/^\/\d+/) ||
+        (a.href || '').match(/modelmayhem\.com\/\d+/)
+      );
+      // Use .href (always absolute) for reliable selfProfileId matching
+      const senderLink = profileA?.href || '';
+      // Name: from the link that has visible text, or fall back to innerText split
+      const namedA = allAs.find(a => (a.innerText || a.textContent || '').trim());
+      const senderName = (namedA?.innerText || namedA?.textContent || '').trim() ||
+        (senderBox.innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
       const text = (textNodes[i]?.innerText || textNodes[i]?.textContent || '').trim();
-      const isSelf = senderLink.includes(`/${selfProfileId}`) || senderName.toLowerCase() === selfName.toLowerCase();
+      const isSelf = (selfProfileId && senderLink.includes('/' + selfProfileId)) ||
+        senderName.toLowerCase() === selfName.toLowerCase();
       return { role: isSelf ? 'self' : 'interlocutor', senderName, text };
     }).filter(m => m.text);
 
