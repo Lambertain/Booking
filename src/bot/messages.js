@@ -42,8 +42,10 @@ function escapeMarkdown(text) {
 
 function truncate(text, max) {
   if (!text) return '(empty)';
-  if (text.length <= max) return text;
-  return text.slice(0, max) + '...';
+  // Collapse 3+ consecutive newlines into 2 (one blank line max)
+  const clean = text.replace(/\n{3,}/g, '\n\n').trim();
+  if (clean.length <= max) return clean;
+  return clean.slice(0, max) + '...';
 }
 
 function collectPhotographerImages(messages) {
