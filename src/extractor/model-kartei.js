@@ -80,11 +80,23 @@ async function extractSingleDialog(page, sel, url) {
       const isSelf = row.matches(selfSel) || row.className.includes('sedcard1');
       return { role: isSelf ? 'self' : 'interlocutor', text };
     });
-    // Photographer name from the interlocutor's message block (sedcard2)
+    // Photographer name — try multiple sources
     const otherBlock = document.querySelector(otherSel);
-    const photographer = otherBlock?.querySelector('.username')?.textContent?.trim() || '';
+    const photographer =
+      otherBlock?.querySelector('.username')?.textContent?.trim() ||
+      otherBlock?.querySelector('a[href*="/sedcards/"]')?.textContent?.trim() ||
+      otherBlock?.querySelector('a[href*="/profile/"]')?.textContent?.trim() ||
+      (document.title.match(/(?:mit|with|von|from)\s+([^\s|–\-][^|–\-]{1,40}?)(?:\s*[|–\-]|$)/i)?.[1]?.trim()) ||
+      '';
     return { messages, photographer };
   }, { rowSel: sel.messageRow, textSel: sel.messageText, selfSel: sel.messageAuthorSelf, otherSel: sel.messageAuthorOther });
+
+  // Fallback: extract name from outgoing greeting (e.g. "Greetings WaScO,")
+  if (!result.photographer) {
+    const selfMsg = result.messages.find(m => m.role === 'self');
+    const match = (selfMsg?.text || '').match(/^(?:Greetings|Hello|Hi|Dear|Hey)\s+([A-Za-z][^\s,!.\n]{1,30})[,!.\n]/i);
+    if (match) result.photographer = match[1];
+  }
 
   // Model-Kartei shows messages newest-first, reverse to chronological order
   return { url, photographer: result.photographer, messages: result.messages.reverse() };

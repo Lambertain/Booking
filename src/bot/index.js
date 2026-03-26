@@ -160,6 +160,8 @@ async function handleApprovalResult(action, text) {
     console.log(`[bot] ${action === 'approve' ? '✅' : '✏️'} ${item.photographer} — чекаємо доставку`);
   } else {
     console.log(`[bot] ⏭ Пропущено: ${item.photographer}`);
+    // Mark as rejected so pipeline won't re-queue on next scan
+    db.updateStatus(item.site, item.url, 'rejected');
     currentApproval = null;
     waitingForEdit = false;
     editMediaFiles = [];
