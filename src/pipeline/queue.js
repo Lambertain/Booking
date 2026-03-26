@@ -18,7 +18,9 @@ function loadQueue() {
 
 function saveQueue(queue) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(QUEUE_FILE, JSON.stringify(queue, null, 2), 'utf8');
+  const tmp = QUEUE_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(queue, null, 2), 'utf8');
+  fs.renameSync(tmp, QUEUE_FILE);
 }
 
 function addToQueue(item) {

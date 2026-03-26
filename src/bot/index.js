@@ -15,6 +15,13 @@ const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 const DATA_DIR = path.resolve(__dirname, '../../data');
 
+async function fetchWithTimeout(url, ms = 30000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 bot.catch((err) => {
   const msg = err?.error?.message || err?.message || String(err);
   if (msg.includes('409') || msg.includes('Conflict')) return;
@@ -107,7 +114,14 @@ async function handleApprovalResult(action, text) {
   const item = currentApproval;
   if (!item) return;
 
-  const modelSlug = item.modelSlug || 'ana-v';
+  const modelSlug = item.modelSlug;
+  if (!modelSlug) {
+    console.error('[bot] item.modelSlug відсутній:', item.photographer, item.site);
+    currentApproval = null;
+    waitingForEdit = false;
+    editMediaFiles = [];
+    return;
+  }
 
   if (action === 'approve' || action === 'edit') {
     const finalText = action === 'edit' ? text : item.draft;
@@ -251,7 +265,7 @@ bot.on('message:photo', async (ctx) => {
       fs.mkdirSync(tmpDir, { recursive: true });
       const ext = path.extname(file.file_path) || '.jpg';
       const localPath = path.join(tmpDir, `edit-${Date.now()}${ext}`);
-      const res = await fetch(downloadUrl);
+      const res = await fetchWithTimeout(downloadUrl);
       fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
       editMediaFiles.push(localPath);
       await ctx.reply(`📎 Фото додано (${editMediaFiles.length}). Можна додати ще або надіслати текст відповіді.`);
@@ -298,41 +312,40 @@ bot.on('message:photo', async (ctx) => {
         fs.mkdirSync(tmpDir, { recursive: true });
         const ext = path.extname(file.file_path) || '.jpg';
         const localPath = path.join(tmpDir, `direct-${Date.now()}${ext}`);
-        const res = await fetch(downloadUrl);
+        const res = await fetchWithTimeout(downloadUrl);
         fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
 
-        // Find URL from processed dialogs, active dialogs, or training log
+        // Find dialog URL + model slug — search DB then training logs across all models
         let url = '';
-        // 1. Processed IDs
+        let foundSlug = '';
+        const modelSlugs = fs.readdirSync(MODELS_DIR)
+          .filter(f => fs.existsSync(path.join(MODELS_DIR, f, 'config.json')));
+
+        // 1. DB (most reliable)
         try {
-          const processed = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'processed', 'processed-ids.json'), 'utf8'));
-          for (const key of Object.keys(processed)) {
-            if (key.includes(photographer) && key.startsWith(site)) { url = key.split('::')[2] || ''; break; }
-          }
+          const row = db.db.prepare(
+            "SELECT url, model_slug FROM dialogs WHERE photographer = ? AND site = ? ORDER BY updated_at DESC LIMIT 1"
+          ).get(photographer, site);
+          if (row) { url = row.url; foundSlug = row.model_slug; }
         } catch {}
-        // 2. Active dialogs
+        // 2. Training logs across all models
         if (!url) {
-          try {
-            const active = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'processed', 'active-dialogs.json'), 'utf8'));
-            const found = active.find(d => d.photographer === photographer && d.site === site);
-            if (found) url = found.url;
-          } catch {}
-        }
-        // 3. Training log
-        if (!url) {
-          try {
-            const lines = fs.readFileSync(path.join(DATA_DIR, 'ana-v', 'training', 'approved-responses.jsonl'), 'utf8').trim().split('\n');
-            for (const line of lines.reverse()) {
-              const e = JSON.parse(line);
-              if (e.photographer === photographer && e.site === site && e.url) { url = e.url; break; }
-            }
-          } catch {}
+          for (const slug of modelSlugs) {
+            if (url) break;
+            try {
+              const lines = fs.readFileSync(path.join(DATA_DIR, slug, 'training', 'approved-responses.jsonl'), 'utf8').trim().split('\n');
+              for (const line of lines.reverse()) {
+                const e = JSON.parse(line);
+                if (e.photographer === photographer && e.site === site && e.url) { url = e.url; foundSlug = slug; break; }
+              }
+            } catch {}
+          }
         }
 
         if (url) {
           const messageText = (sendMatch[3] || '').trim();
           addToSendQueue({
-            modelSlug: 'ana-v',
+            modelSlug: foundSlug || modelSlugs[0],
             site,
             photographer,
             url,
@@ -370,7 +383,7 @@ bot.on('message:document', async (ctx) => {
       fs.mkdirSync(tmpDir, { recursive: true });
       const ext = path.extname(file.file_path) || '';
       const localPath = path.join(tmpDir, `edit-${Date.now()}${ext}`);
-      const res = await fetch(downloadUrl);
+      const res = await fetchWithTimeout(downloadUrl);
       fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
       editMediaFiles.push(localPath);
       await ctx.reply(`📎 Файл додано (${editMediaFiles.length}). Можна додати ще або надіслати текст відповіді.`);
@@ -387,6 +400,19 @@ async function startBot() {
   await bot.api.deleteWebhook({ drop_pending_updates: true });
   await new Promise(r => setTimeout(r, 2000));
   startQueueProcessor();
+
+  // Clean up tmp media files older than 24h (every hour)
+  setInterval(() => {
+    const tmpDir = path.resolve(__dirname, '../../data/tmp');
+    if (!fs.existsSync(tmpDir)) return;
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    try {
+      for (const f of fs.readdirSync(tmpDir)) {
+        const full = path.join(tmpDir, f);
+        try { if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full); } catch {}
+      }
+    } catch {}
+  }, 60 * 60 * 1000);
   const startPolling = () => {
     bot.start({ onStart: () => console.log('Telegram bot started'), drop_pending_updates: true })
       .catch(err => {

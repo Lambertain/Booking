@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runPipelineForModel } = require('../pipeline/index');
-const { takeSendNext, sendQueueLength } = require('../pipeline/send-queue');
+const { peekSendNext, removeSendFirst, updateSendFirst, sendQueueLength } = require('../pipeline/send-queue');
 const { sendReply } = require('../extractor/sender');
 
 const MODELS_DIR = path.resolve(__dirname, '../../models');
@@ -27,7 +27,8 @@ let scanTimer = null;
 async function processSendQueue() {
   if (sendPaused || sendQueueLength() === 0) return;
 
-  const toSend = takeSendNext();
+  // Peek — item stays in queue until send succeeds (survives crash)
+  const toSend = peekSendNext();
   if (!toSend) return;
 
   try {
@@ -37,6 +38,14 @@ async function processSendQueue() {
     if (!siteConfig) throw new Error(`Site config not found: ${toSend.site}`);
 
     await sendReply(config.adspower.profileId, siteConfig, toSend.url, toSend.text, toSend.mediaFiles || []);
+    // Remove from queue only after successful send
+    removeSendFirst();
+    // Clean up temp media files
+    if (toSend.mediaFiles && toSend.mediaFiles.length > 0) {
+      for (const f of toSend.mediaFiles) {
+        try { fs.unlinkSync(f); } catch {}
+      }
+    }
     console.log(`[scheduler] ✅ Надіслано: ${toSend.photographer} (${toSend.site})`);
     const { onDeliveryResult } = require('../bot/index');
     onDeliveryResult(true, toSend.photographer, toSend.site, null, toSend.url);
@@ -46,20 +55,16 @@ async function processSendQueue() {
     const retryCount = toSend._retryCount || 0;
     if (retryCount < 1) {
       console.log(`[scheduler] 🔄 Авто-retry через 30с...`);
-      toSend._retryCount = retryCount + 1;
-      const { addToSendQueue } = require('../pipeline/send-queue');
-      addToSendQueue(toSend);
+      // Update retryCount in-place (item stays first in queue)
+      updateSendFirst({ _retryCount: retryCount + 1 });
       const { onDeliveryResult } = require('../bot/index');
       onDeliveryResult(false, toSend.photographer, toSend.site, `${err.message} (retry через 30с)`);
       await new Promise(r => setTimeout(r, 30000));
-      // Try again immediately
       try { await processSendQueue(); } catch {}
     } else {
       const { onDeliveryResult } = require('../bot/index');
       onDeliveryResult(false, toSend.photographer, toSend.site, err.message);
-      const { addToSendQueue } = require('../pipeline/send-queue');
-      addToSendQueue(toSend);
-      sendPaused = true;
+      sendPaused = true; // Item stays in queue, manual resume required
     }
   }
 }
@@ -71,11 +76,14 @@ async function triggerSend() {
   // Send queue always works, even if pipeline is running
   if (!isSending) {
     isSending = true;
-    try { await processSendQueue(); } finally { isSending = false; }
+    try {
+      await processSendQueue();
+      // Wait for AdsPower to settle after sender closed it (inside lock)
+      await new Promise(r => setTimeout(r, 3000));
+    } finally {
+      isSending = false;
+    }
   }
-
-  // Wait for AdsPower to settle after sender closed it
-  await new Promise(r => setTimeout(r, 3000));
 
   // Full scan only if pipeline not running
   if (isRunning) return;

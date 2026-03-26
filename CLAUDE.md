@@ -35,7 +35,7 @@
 ## Production Server (AdsPower + Booking)
 - IP: 185.203.242.10
 - OS: Windows Server
-- SSH: `Administrator` / `7ow1s82cM41L`
+- SSH: `Administrator` / `<пароль в .env или защищённых заметках>`
 - SSH подключение: только через paramiko (Python), не ssh команду
 - AdsPower: http://local.adspower.net:50325 (только localhost)
 - AdsPower headless: `"C:\Program Files\AdsPower Global\AdsPower Global.exe" --headless=true --api-key=<KEY>`
@@ -45,4 +45,4 @@
 ## Cloudflare (info@lambertain.agency)
 - Account ID: 6905c5c480b1d43eefdc36b074fdc4e8
 - Zero Trust team: lambertain
-- Пароль: bkC^)D34s8)J3
+- Пароль: `<пароль в .env или защищённых заметках>`

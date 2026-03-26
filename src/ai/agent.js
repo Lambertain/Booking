@@ -10,6 +10,17 @@ const DATA_DIR = path.resolve(__dirname, '../../data');
 const chatHistory = [];
 const MAX_HISTORY = 30;
 
+// Pending destructive operations requiring confirmation
+let pendingRemove = null; // { slug, expiresAt }
+
+// Allowed fields for CONFIG_SET (prevents arbitrary config writes)
+const CONFIG_SET_ALLOWED_SITE_FIELDS = new Set([
+  'selfProfilePattern', 'selfProfileId', 'selfName'
+]);
+const CONFIG_SET_ALLOWED_AIRTABLE_FIELDS = new Set([
+  'baseId', 'tableId'
+]);
+
 // --- Model management ---
 
 const SITE_TEMPLATES = {
@@ -385,37 +396,51 @@ async function chat(userMessage) {
           actionResults.push(`⚠️ ${result.error}`);
         }
       } else if (a.type === 'remove_model') {
-        const result = removeModel(a.slug);
-        if (result.ok) {
-          actionResults.push(`🗑 Модель ${a.slug} удалена`);
+        // Require confirmation: same command within 60s
+        if (pendingRemove && pendingRemove.slug === a.slug && Date.now() < pendingRemove.expiresAt) {
+          pendingRemove = null;
+          const result = removeModel(a.slug);
+          if (result.ok) {
+            actionResults.push(`🗑 Модель ${a.slug} видалена`);
+          } else {
+            actionResults.push(`⚠️ ${result.error}`);
+          }
         } else {
-          actionResults.push(`⚠️ ${result.error}`);
+          pendingRemove = { slug: a.slug, expiresAt: Date.now() + 60000 };
+          actionResults.push(`⚠️ Видалення ${a.slug} — повторіть команду протягом 60с для підтвердження`);
         }
       } else if (a.type === 'config_set') {
         const configPath = path.join(MODELS_DIR, a.slug, 'config.json');
         if (fs.existsSync(configPath)) {
           const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          // Parse path like "sites.adultfolio.selfProfilePattern"
           const parts = a.path.split('.');
           if (parts[0] === 'sites' && parts.length === 3) {
-            const site = config.sites.find(s => s.id === parts[1]);
-            if (site) {
-              site[parts[2]] = a.value;
-              fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-              actionResults.push(`⚙️ ${a.slug}: ${parts[1]}.${parts[2]} = ${a.value}`);
+            if (!CONFIG_SET_ALLOWED_SITE_FIELDS.has(parts[2])) {
+              actionResults.push(`⚠️ CONFIG_SET: поле "${parts[2]}" не дозволено`);
             } else {
-              actionResults.push(`⚠️ Сайт ${parts[1]} не найден у ${a.slug}`);
+              const site = config.sites.find(s => s.id === parts[1]);
+              if (site) {
+                site[parts[2]] = a.value;
+                fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+                actionResults.push(`⚙️ ${a.slug}: ${parts[1]}.${parts[2]} = ${a.value}`);
+              } else {
+                actionResults.push(`⚠️ Сайт ${parts[1]} не знайдено у ${a.slug}`);
+              }
             }
           } else if (parts[0] === 'airtable' && parts.length === 2) {
-            if (!config.airtable) config.airtable = {};
-            config.airtable[parts[1]] = a.value;
-            fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-            actionResults.push(`⚙️ ${a.slug}: airtable.${parts[1]} = ${a.value.slice(0, 20)}...`);
+            if (!CONFIG_SET_ALLOWED_AIRTABLE_FIELDS.has(parts[1])) {
+              actionResults.push(`⚠️ CONFIG_SET: поле "airtable.${parts[1]}" не дозволено`);
+            } else {
+              if (!config.airtable) config.airtable = {};
+              config.airtable[parts[1]] = a.value;
+              fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+              actionResults.push(`⚙️ ${a.slug}: airtable.${parts[1]} = ${a.value.slice(0, 20)}...`);
+            }
           } else {
-            actionResults.push(`⚠️ Неизвестный путь: ${a.path}`);
+            actionResults.push(`⚠️ Невідомий шлях: ${a.path}`);
           }
         } else {
-          actionResults.push(`⚠️ Модель ${a.slug} не найдена`);
+          actionResults.push(`⚠️ Модель ${a.slug} не знайдена`);
         }
       }
     } catch (err) {
