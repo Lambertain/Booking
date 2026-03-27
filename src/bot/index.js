@@ -35,6 +35,27 @@ let waitingForDelivery = false;  // blocks queue until delivery confirmed
 let queueLock = false;
 let editMediaFiles = [];  // collected media during EDIT mode
 
+// АПКА pending edits: chatId → { msgId }
+const apkaPendingEdits = new Map();
+
+// Deliver approved reply from АПКА to Railway app
+async function apkaDeliver(msgId, text) {
+  const appUrl = process.env.APP_API_URL;
+  const secret = process.env.APP_API_SECRET;
+  if (!appUrl || !secret) return false;
+  try {
+    const res = await fetch(`${appUrl}/api/sync/deliver-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ msgId, text }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[apka deliver]', err.message);
+    return false;
+  }
+}
+
 // --- Called by scheduler after delivery attempt ---
 function onDeliveryResult(success, photographer, site, error, url) {
   if (success) {
@@ -187,6 +208,43 @@ bot.on('callback_query:data', async (ctx) => {
   const [action, ...idParts] = ctx.callbackQuery.data.split(':');
   const approvalId = idParts.join(':');
 
+  // --- АПКА callbacks ---
+  if (action === 'apka_ok' || action === 'apka_edit' || action === 'apka_skip') {
+    const msgId = parseInt(idParts[0]);
+    const tgChatId = String(ctx.callbackQuery.message.chat.id);
+
+    if (action === 'apka_ok') {
+      // Get AI draft from Railway
+      const appUrl = process.env.APP_API_URL;
+      const secret = process.env.APP_API_SECRET;
+      let draftText = null;
+      try {
+        const r = await fetch(`${appUrl}/api/sync/ai-draft/${msgId}`, {
+          headers: { Authorization: `Bearer ${secret}` },
+        });
+        if (r.ok) { const d = await r.json(); draftText = d.ai_draft; }
+      } catch {}
+
+      if (!draftText) {
+        await ctx.answerCallbackQuery({ text: 'Чернетка не знайдена' });
+        return;
+      }
+      const ok = await apkaDeliver(msgId, draftText);
+      await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+      await ctx.answerCallbackQuery({ text: ok ? '✅ Відправлено' : '❌ Помилка' });
+
+    } else if (action === 'apka_edit') {
+      apkaPendingEdits.set(tgChatId, { msgId, tgMsgId: ctx.callbackQuery.message.message_id });
+      await ctx.answerCallbackQuery({ text: 'Введіть текст' });
+      await bot.api.sendMessage(tgChatId, '✏️ Надішліть відредагований текст відповіді:');
+
+    } else if (action === 'apka_skip') {
+      await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+      await ctx.answerCallbackQuery({ text: '⏭ Пропущено' });
+    }
+    return;
+  }
+
   if (!currentApproval || currentApproval.approvalId !== approvalId) {
     await ctx.answerCallbackQuery({ text: 'Цей елемент вже не активний' });
     return;
@@ -212,6 +270,20 @@ bot.on('callback_query:data', async (ctx) => {
 // --- Text handler ---
 bot.on('message:text', async (ctx) => {
   const text = ctx.message.text.trim();
+  const tgChatId = String(ctx.message.chat.id);
+
+  // АПКА edit mode
+  if (apkaPendingEdits.has(tgChatId)) {
+    const { msgId, tgMsgId } = apkaPendingEdits.get(tgChatId);
+    apkaPendingEdits.delete(tgChatId);
+    const ok = await apkaDeliver(msgId, text);
+    // Remove buttons from draft message
+    try {
+      await bot.api.editMessageReplyMarkup(tgChatId, tgMsgId, { reply_markup: undefined });
+    } catch {}
+    await ctx.reply(ok ? '✅ Відправлено' : '❌ Помилка доставки');
+    return;
+  }
 
   // Edit mode — text goes to photographer
   if (currentApproval && waitingForEdit) {

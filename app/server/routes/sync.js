@@ -42,4 +42,56 @@ router.post('/shoot', async (req, res) => {
   }
 });
 
+// POST /api/sync/deliver-reply — called by booking bot to deliver approved reply from АПКА
+router.post('/deliver-reply', async (req, res) => {
+  try {
+    const secret = (req.headers.authorization || '').replace('Bearer ', '');
+    if (!secret || secret !== process.env.SYNC_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { msgId, text, approverId } = req.body;
+    if (!msgId || !text) return res.status(400).json({ error: 'msgId and text required' });
+
+    const { deliverApprovedReply, forwardToTelegram } = require('../bot-notify');
+    const { one } = require('../db');
+
+    const userMsg = await one('SELECT * FROM messages WHERE id = $1', [msgId]);
+    if (!userMsg) return res.status(404).json({ error: 'Message not found' });
+
+    const conv = await one('SELECT * FROM conversations WHERE id = $1', [userMsg.conversation_id]);
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+
+    const approver = approverId
+      ? await one('SELECT * FROM users WHERE id = $1', [approverId]).catch(() => null)
+      : null;
+
+    const replyMsg = await deliverApprovedReply(conv.id, text, approver?.id || 1);
+
+    // Forward to recipient's Telegram DM if they have telegram_id
+    const recipientId = conv.participant_a === (approver?.id || 1) ? conv.participant_b : conv.participant_a;
+    forwardToTelegram(recipientId, approver?.name || 'Менеджер', text).catch(() => {});
+
+    res.json({ ok: true, messageId: replyMsg.id });
+  } catch (err) {
+    console.error('[sync/deliver-reply] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/sync/ai-draft/:msgId — get AI draft for a message
+router.get('/ai-draft/:msgId', async (req, res) => {
+  try {
+    const secret = (req.headers.authorization || '').replace('Bearer ', '');
+    if (!secret || secret !== process.env.SYNC_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const row = await one('SELECT ai_draft FROM messages WHERE id = $1', [req.params.msgId]);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json({ ai_draft: row.ai_draft });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
