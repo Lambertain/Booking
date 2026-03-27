@@ -77,6 +77,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
   const [tab, setTab] = useState('calendar');
   const [editSheet, setEditSheet] = useState(false);
   const [tourSheet, setTourSheet] = useState(false);
+  const [createShoot, setCreateShoot] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const rawSites  = parseSites(model.sites_json);
@@ -160,9 +161,19 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
         title={profile.display_name || model.name}
         left={onBack ? <button className="back-btn" onClick={onBack}>‹ {t('back')}</button> : null}
         right={canEdit && (
-          <button className="btn btn-sm btn-secondary" onClick={() => setEditSheet(true)}>
-            {t('edit')}
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={() => setCreateShoot(true)}
+              style={{
+                width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                background: 'var(--accent)', color: '#fff', fontSize: 22, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 300,
+              }}
+            >+</button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setEditSheet(true)}>
+              {t('edit')}
+            </button>
+          </div>
         )}
       />
 
@@ -355,6 +366,17 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
         </div>
         <button className="btn btn-primary btn-full" onClick={addTour}>Добавить</button>
       </Sheet>
+
+      {/* ── Create shoot sheet ── */}
+      <CreateShootSheet
+        open={createShoot}
+        onClose={() => setCreateShoot(false)}
+        modelId={model.id}
+        onCreated={shoot => {
+          onShootUpdated?.(shoot);
+          setCreateShoot(false);
+        }}
+      />
     </div>
   );
 }
@@ -413,5 +435,106 @@ function ProfileTab({ sitesList, activeSites, selectedStyles, stylePrices, canEd
         </button>
       )}
     </div>
+  );
+}
+
+/* ── Create shoot sheet ── */
+const EMPTY_SHOOT = {
+  photographer_name: '', photographer_site: '', photographer_email: '',
+  photographer_phone: '', photographer_telegram: '', dialog_url: '',
+  shoot_date: '', location: '', rate: '', currency: 'EUR',
+  status: 'negotiating', notes: '',
+};
+const STATUSES_CREATE = ['negotiating', 'confirmed', 'done', 'cancelled'];
+
+function CreateShootSheet({ open, onClose, modelId, onCreated }) {
+  const { t } = useLang();
+  const [form, setForm] = useState(EMPTY_SHOOT);
+  const [saving, setSaving] = useState(false);
+
+  function f(key, val) { setForm(p => ({ ...p, [key]: val })); }
+
+  async function save() {
+    if (!form.photographer_name.trim()) return;
+    setSaving(true);
+    try {
+      const shoot = await api.post('/api/shoots', {
+        model_id: modelId,
+        ...form,
+        rate: form.rate ? parseFloat(form.rate) : null,
+        shoot_date: form.shoot_date || null,
+      });
+      setForm(EMPTY_SHOOT);
+      onCreated(shoot);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Новая съёмка">
+      <div style={{ overflowY: 'auto', maxHeight: '72vh', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div className="list-section-title" style={{ marginBottom: 6 }}>Фотограф</div>
+        {[
+          { key: 'photographer_name',     label: 'Имя *',    ph: 'Имя фотографа' },
+          { key: 'photographer_site',     label: 'Площадка', ph: 'PurplePort / Model-Kartei...' },
+          { key: 'photographer_email',    label: 'Email',    ph: 'email@example.com', type: 'email' },
+          { key: 'photographer_phone',    label: 'Телефон',  ph: '+49 ...',           type: 'tel' },
+          { key: 'photographer_telegram', label: 'Telegram', ph: '@username' },
+          { key: 'dialog_url',            label: 'Диалог',   ph: 'https://...' },
+        ].map(fi => (
+          <div className="input-group" key={fi.key}>
+            <div className="input-label">{fi.label}</div>
+            <input type={fi.type || 'text'} value={form[fi.key]}
+              onChange={e => f(fi.key, e.target.value)} placeholder={fi.ph} />
+          </div>
+        ))}
+
+        <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Съёмка</div>
+        <div className="input-group">
+          <div className="input-label">Дата</div>
+          <input type="date" value={form.shoot_date} onChange={e => f('shoot_date', e.target.value)} />
+        </div>
+        <div className="input-group">
+          <div className="input-label">Локация</div>
+          <input value={form.location} onChange={e => f('location', e.target.value)} placeholder="Город, место" />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div className="input-group" style={{ flex: 1 }}>
+            <div className="input-label">Ставка</div>
+            <input type="number" value={form.rate} onChange={e => f('rate', e.target.value)} placeholder="0" />
+          </div>
+          <div className="input-group" style={{ width: 84 }}>
+            <div className="input-label">Валюта</div>
+            <select value={form.currency} onChange={e => f('currency', e.target.value)}>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+              <option value="PLN">PLN</option>
+            </select>
+          </div>
+        </div>
+        <div className="input-group">
+          <div className="input-label">Статус</div>
+          <select value={form.status} onChange={e => f('status', e.target.value)}>
+            {STATUSES_CREATE.map(s => <option key={s} value={s}>{t(`shoots.statusLabels.${s}`)}</option>)}
+          </select>
+        </div>
+        <div className="input-group">
+          <div className="input-label">Заметки</div>
+          <textarea value={form.notes} onChange={e => f('notes', e.target.value)} rows={2} placeholder="Условия, детали..." />
+        </div>
+      </div>
+      <button
+        className="btn btn-primary btn-full"
+        style={{ marginTop: 16 }}
+        onClick={save}
+        disabled={saving || !form.photographer_name.trim()}
+      >
+        {saving ? '...' : 'Создать съёмку'}
+      </button>
+    </Sheet>
   );
 }
