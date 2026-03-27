@@ -1,51 +1,29 @@
-import React, { useState } from 'react';
-import { api } from '../api.js';
+import React, { useEffect, useState } from 'react';
 import { useLang } from '../i18n/useLang.js';
 import LangSwitcher from '../i18n/LangSwitcher.jsx';
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage() {
   const { t } = useLang();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('Відкрийте цю сторінку через Telegram');
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const data = await api.post('/api/auth/login', { email, password });
-      onLogin(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (tg?.initData) {
+      setStatus('Авторизація через Telegram...');
     }
-  }
+  }, []);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh' }}>
-      <div className="card" style={{ width: 340 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent2)' }}>{t('auth.title')}</div>
-          <LangSwitcher />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', flexDirection: 'column', gap: 24 }}>
+      <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent2)' }}>Lambertain Booking</div>
+      <div className="card" style={{ width: 320, textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>✈️</div>
+        <div style={{ color: 'var(--text2)', lineHeight: 1.6 }}>{status}</div>
+        <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text2)' }}>
+          Якщо ви не зареєстровані — зверніться до адміністратора
         </div>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <input
-            type="email" placeholder={t('auth.email')} value={email}
-            onChange={e => setEmail(e.target.value)} required
-          />
-          <input
-            type="password" placeholder={t('auth.password')} value={password}
-            onChange={e => setPassword(e.target.value)} required
-          />
-          {error && <div className="error">{error}</div>}
-          <button className="btn-primary" type="submit" disabled={loading}>
-            {loading ? t('auth.loggingIn') : t('auth.login')}
-          </button>
-        </form>
       </div>
+      <LangSwitcher />
     </div>
   );
 }
