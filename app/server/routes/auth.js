@@ -33,6 +33,14 @@ router.post('/tg', async (req, res) => {
     const tgUser = verifyTelegramInitData(initData);
 
     let user = await one('SELECT * FROM users WHERE telegram_id = $1 AND is_active = TRUE', [tgUser.id]);
+    // Fallback: match by username (first login — telegram_id not set yet)
+    if (!user && tgUser.username) {
+      user = await one('SELECT * FROM users WHERE LOWER(telegram_username) = LOWER($1) AND is_active = TRUE', [tgUser.username]);
+      if (user) {
+        await one('UPDATE users SET telegram_id = $1 WHERE id = $2', [tgUser.id, user.id]);
+        user.telegram_id = tgUser.id;
+      }
+    }
     if (!user) return res.status(403).json({ error: 'User not registered. Contact admin.' });
 
     // Update telegram_username if changed
