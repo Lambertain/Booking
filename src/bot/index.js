@@ -466,11 +466,34 @@ bot.on('message:document', async (ctx) => {
   }
 });
 
+// --- HTTP server to receive forwarded updates from Railway webhook ---
+function startUpdateServer() {
+  const http = require('http');
+  const port = parseInt(process.env.BOT_WEBHOOK_PORT || '3456');
+
+  const server = http.createServer((req, res) => {
+    if (req.method !== 'POST' || req.url !== '/update') {
+      res.writeHead(404); res.end(); return;
+    }
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      res.writeHead(200); res.end('ok');
+      try {
+        const update = JSON.parse(body);
+        bot.handleUpdate(update).catch(e => console.error('[update]', e.message));
+      } catch (e) {
+        console.error('[update parse]', e.message);
+      }
+    });
+  });
+
+  server.listen(port, () => console.log(`[bot] Update server on port ${port}`));
+}
+
 // --- Lifecycle ---
 async function startBot() {
   console.log('Telegram bot starting...');
-  await bot.api.deleteWebhook({ drop_pending_updates: true });
-  await new Promise(r => setTimeout(r, 2000));
   startQueueProcessor();
 
   // Clean up tmp media files older than 24h (every hour)
@@ -485,16 +508,9 @@ async function startBot() {
       }
     } catch {}
   }, 60 * 60 * 1000);
-  const startPolling = () => {
-    bot.start({ onStart: () => console.log('Telegram bot started'), drop_pending_updates: true })
-      .catch(err => {
-        if (String(err?.message || '').includes('409')) {
-          console.log('Polling conflict, retrying in 5s...');
-          setTimeout(startPolling, 5000);
-        } else { console.error('Bot start error:', err?.message); }
-      });
-  };
-  startPolling();
+
+  startUpdateServer();
+  console.log('Telegram bot started (webhook mode via Railway)');
 }
 
 function stopBot() { bot.stop(); }

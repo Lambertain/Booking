@@ -6,6 +6,33 @@ const router = express.Router();
 // In-memory state for pending edits: tgChatId → { msgId }
 const pendingEdits = new Map();
 
+const BOOKING_CHAT_ID = process.env.TG_BOOKING_CHAT_ID;
+
+// Forward БУКИНГ updates to Windows Server booking bot
+async function forwardToBookingBot(update) {
+  const botWebhookUrl = process.env.BOT_WEBHOOK_URL; // e.g. http://185.203.242.10:3456/update
+  if (!botWebhookUrl) return false;
+  try {
+    const res = await fetch(botWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function isBookingUpdate(update) {
+  const chatId = String(
+    update.message?.chat?.id ||
+    update.callback_query?.message?.chat?.id || ''
+  );
+  return chatId === String(BOOKING_CHAT_ID);
+}
+
 // POST /api/bot/webhook — receives updates from Telegram
 router.post('/webhook', async (req, res) => {
   // Always respond immediately to Telegram
@@ -13,6 +40,12 @@ router.post('/webhook', async (req, res) => {
 
   try {
     const update = req.body;
+
+    // Forward БУКИНГ updates to Windows Server booking bot
+    if (isBookingUpdate(update)) {
+      forwardToBookingBot(update);
+      return;
+    }
 
     // --- callback_query (button press) ---
     if (update.callback_query) {
