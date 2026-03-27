@@ -117,11 +117,17 @@ export default {
     title: 'Розсилки',
     empty: 'Замовлень немає',
     newOrder: 'Нове замовлення',
+    client: 'Клієнт',
+    selectClient: 'Оберіть клієнта...',
+    orderType: 'Тип',
+    orderTypeLabels: { rent: 'Оренда', sale: 'Продаж' },
+    rentalStart: 'Початок оренди',
+    rentalEnd: 'Кінець оренди',
     sites: 'Сайти',
     regions: 'Регіони',
-    genres: 'Жанри',
     volume: 'Об\'єм',
     price: 'Ціна',
+    notes: 'Нотатки',
     statusLabels: {
       new: 'Нове',
       in_progress: 'В роботі',
@@ -135,8 +141,6 @@ export default {
     empty: 'Шаблонів немає',
     newTemplate: 'Новий шаблон',
     name: 'Назва',
-    content: 'Текст шаблону',
-    sites: 'Сайти',
   },
 
   settings: {

@@ -111,11 +111,17 @@ export default {
     title: 'Mailings',
     empty: 'No orders',
     newOrder: 'New order',
+    client: 'Client',
+    selectClient: 'Select client...',
+    orderType: 'Type',
+    orderTypeLabels: { rent: 'Rental', sale: 'Purchase' },
+    rentalStart: 'Rental start',
+    rentalEnd: 'Rental end',
     sites: 'Sites',
     regions: 'Regions',
-    genres: 'Genres',
     volume: 'Volume',
     price: 'Price',
+    notes: 'Notes',
     statusLabels: {
       new: 'New',
       in_progress: 'In progress',
@@ -129,8 +135,6 @@ export default {
     empty: 'No templates',
     newTemplate: 'New template',
     name: 'Name',
-    content: 'Template text',
-    sites: 'Sites',
   },
 
   settings: {

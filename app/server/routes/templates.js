@@ -17,12 +17,12 @@ router.get('/', requireAuth('admin', 'manager', 'client'), async (req, res) => {
 // POST /api/templates
 router.post('/', requireAuth('admin', 'manager'), async (req, res) => {
   try {
-    const { name, content, sites } = req.body;
+    const { name, rental_start, rental_end } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
     const row = await one(
-      `INSERT INTO mailing_templates (name, content, sites, created_by)
+      `INSERT INTO mailing_templates (name, created_by, rental_start, rental_end)
        VALUES ($1,$2,$3,$4) RETURNING *`,
-      [name, content || null, sites || null, req.user.id]
+      [name, req.user.id, rental_start || null, rental_end || null]
     );
     res.status(201).json(row);
   } catch (err) {
@@ -33,13 +33,13 @@ router.post('/', requireAuth('admin', 'manager'), async (req, res) => {
 // PATCH /api/templates/:id
 router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
   try {
-    const { name, content, sites } = req.body;
+    const { name, rental_start, rental_end } = req.body;
     const updates = [];
     const vals = [];
     let i = 1;
-    if (name !== undefined)    { updates.push(`name = $${i++}`);    vals.push(name); }
-    if (content !== undefined) { updates.push(`content = $${i++}`); vals.push(content); }
-    if (sites !== undefined)   { updates.push(`sites = $${i++}`);   vals.push(sites); }
+    if (name !== undefined)         { updates.push(`name = $${i++}`);         vals.push(name); }
+    if (rental_start !== undefined) { updates.push(`rental_start = $${i++}`); vals.push(rental_start); }
+    if (rental_end !== undefined)   { updates.push(`rental_end = $${i++}`);   vals.push(rental_end); }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     vals.push(req.params.id);
     const row = await one(`UPDATE mailing_templates SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`, vals);
