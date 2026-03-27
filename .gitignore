@@ -3,3 +3,4 @@ data/
 .env
 *.log
 deploy-server.py
+CLAUDE.md
