@@ -49,14 +49,27 @@ function buildFullSitesList(saved) {
   const result = SITES.map(s => ({
     ...s,
     active: savedMap[s.id]?.active || false,
-    price: savedMap[s.id]?.price || '',
   }));
   for (const s of saved) {
     if (!SITES.find(x => x.id === s.id)) {
-      result.push({ id: s.id, label: s.label || s.id, active: s.active, price: s.price || '' });
+      result.push({ id: s.id, label: s.label || s.id, active: s.active });
     }
   }
   return result;
+}
+
+// styles_json: [{name, price}] (new) or ["name",...] (old)
+function parseStyles(raw) {
+  if (!raw) return { selected: new Set(), prices: {} };
+  const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (!arr.length) return { selected: new Set(), prices: {} };
+  if (typeof arr[0] === 'string') {
+    return { selected: new Set(arr), prices: {} };
+  }
+  const selected = new Set(arr.map(s => s.name));
+  const prices = {};
+  for (const s of arr) prices[s.name] = s.price || '';
+  return { selected, prices };
 }
 
 export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpdated, onModelUpdated }) {
@@ -66,19 +79,18 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
   const [tourSheet, setTourSheet] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const rawSites = parseSites(model.sites_json);
-  const rawStyles = model.styles_json
-    ? (typeof model.styles_json === 'string' ? JSON.parse(model.styles_json) : model.styles_json)
-    : [];
-  const rawTours = model.tours_json
+  const rawSites  = parseSites(model.sites_json);
+  const rawTours  = model.tours_json
     ? (typeof model.tours_json === 'string' ? JSON.parse(model.tours_json) : model.tours_json)
     : [];
+  const { selected: initStyles, prices: initPrices } = parseStyles(model.styles_json);
 
-  const [sitesList, setSitesList]       = useState(() => buildFullSitesList(rawSites));
-  const [selectedStyles, setSelectedStyles] = useState(() => new Set(rawStyles));
-  const [customStyle, setCustomStyle]   = useState('');
-  const [customSite, setCustomSite]     = useState('');
-  const [tours, setTours]               = useState(rawTours);
+  const [sitesList, setSitesList]           = useState(() => buildFullSitesList(rawSites));
+  const [selectedStyles, setSelectedStyles] = useState(() => initStyles);
+  const [stylePrices, setStylePrices]       = useState(() => initPrices);
+  const [customStyle, setCustomStyle]       = useState('');
+  const [customSite, setCustomSite]         = useState('');
+  const [tours, setTours]                   = useState(rawTours);
   const [newTour, setNewTour]           = useState({ city: '', date_from: '', date_to: '' });
   const [profile, setProfile]           = useState({
     display_name: model.display_name || model.name || '',
@@ -93,8 +105,8 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
   function toggleSite(id) {
     setSitesList(prev => prev.map(s => s.id === id ? { ...s, active: !s.active } : s));
   }
-  function setSitePrice(id, price) {
-    setSitesList(prev => prev.map(s => s.id === id ? { ...s, price } : s));
+  function setStylePrice(name, price) {
+    setStylePrices(prev => ({ ...prev, [name]: price }));
   }
   function toggleStyle(style) {
     setSelectedStyles(prev => {
@@ -132,7 +144,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
       const updated = await api.patch(`/api/users/${model.id}/profile`, {
         ...profile,
         sites_json: sitesList,
-        styles_json: [...selectedStyles],
+        styles_json: [...selectedStyles].map(name => ({ name, price: stylePrices[name] || '' })),
         tours_json: tours,
       });
       onModelUpdated?.({ ...model, ...updated });
@@ -243,6 +255,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
             sitesList={sitesList}
             activeSites={activeSites}
             selectedStyles={selectedStyles}
+            stylePrices={stylePrices}
             canEdit={canEdit}
             onEditClick={() => setEditSheet(true)}
           />
@@ -266,50 +279,55 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
             </div>
           ))}
 
-          {/* Sites */}
+          {/* Sites — checkboxes only, no price */}
           <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Сайты</div>
-          {sitesList.map(s => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <input type="checkbox" checked={s.active} onChange={() => toggleSite(s.id)}
-                style={{ width: 18, height: 18, accentColor: 'var(--accent)', flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 14, color: s.active ? 'var(--text)' : 'var(--text3)' }}>{s.label}</span>
-              {s.active && (
-                <input
-                  value={s.price}
-                  onChange={e => setSitePrice(s.id, e.target.value)}
-                  placeholder="цена €"
-                  style={{ width: 72, fontSize: 13, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)' }}
-                />
-              )}
-            </div>
-          ))}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+            {sitesList.map(s => (
+              <button
+                key={s.id}
+                onClick={() => toggleSite(s.id)}
+                style={{
+                  fontSize: 12, borderRadius: 8, padding: '5px 10px', border: 'none', cursor: 'pointer',
+                  background: s.active ? 'var(--accent)' : 'var(--bg3)',
+                  color: s.active ? '#fff' : 'var(--text2)',
+                  fontWeight: s.active ? 600 : 400,
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
             <input value={customSite} onChange={e => setCustomSite(e.target.value)} placeholder="Добавить сайт..." style={{ flex: 1 }} />
             <button className="btn btn-secondary" style={{ flexShrink: 0 }} onClick={addCustomSite}>+</button>
           </div>
 
-          {/* Styles */}
-          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Стили</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-            {STYLES.map(s => (
-              <button key={s} onClick={() => toggleStyle(s)} style={{
-                fontSize: 12, borderRadius: 8, padding: '5px 10px', border: 'none', cursor: 'pointer',
-                background: selectedStyles.has(s) ? 'var(--accent)' : 'var(--bg3)',
-                color: selectedStyles.has(s) ? '#fff' : 'var(--text2)',
-                fontWeight: selectedStyles.has(s) ? 600 : 400,
-              }}>
-                {s}
+          {/* Styles — toggle + price per style */}
+          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Стили и цены</div>
+          {[...STYLES, ...[...selectedStyles].filter(s => !STYLES.includes(s))].map(s => (
+            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <button
+                onClick={() => toggleStyle(s)}
+                style={{
+                  flex: 1, textAlign: 'left', padding: '6px 10px', borderRadius: 8, border: 'none',
+                  cursor: 'pointer', fontSize: 13,
+                  background: selectedStyles.has(s) ? 'var(--accent)' : 'var(--bg3)',
+                  color: selectedStyles.has(s) ? '#fff' : 'var(--text2)',
+                  fontWeight: selectedStyles.has(s) ? 600 : 400,
+                }}
+              >
+                {s}{!STYLES.includes(s) ? ' ×' : ''}
               </button>
-            ))}
-            {[...selectedStyles].filter(s => !STYLES.includes(s)).map(s => (
-              <button key={s} onClick={() => toggleStyle(s)} style={{
-                fontSize: 12, borderRadius: 8, padding: '5px 10px', border: 'none', cursor: 'pointer',
-                background: 'var(--accent)', color: '#fff', fontWeight: 600,
-              }}>
-                {s} ×
-              </button>
-            ))}
-          </div>
+              {selectedStyles.has(s) && (
+                <input
+                  value={stylePrices[s] || ''}
+                  onChange={e => setStylePrice(s, e.target.value)}
+                  placeholder="€/h"
+                  style={{ width: 68, fontSize: 13, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)' }}
+                />
+              )}
+            </div>
+          ))}
           <div style={{ display: 'flex', gap: 6 }}>
             <input value={customStyle} onChange={e => setCustomStyle(e.target.value)} placeholder="Добавить стиль..." style={{ flex: 1 }} />
             <button className="btn btn-secondary" style={{ flexShrink: 0 }} onClick={addCustomStyle}>+</button>
@@ -342,42 +360,47 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
 }
 
 /* ── Profile tab (read-only view) ── */
-function ProfileTab({ sitesList, activeSites, selectedStyles, canEdit, onEditClick }) {
+function ProfileTab({ sitesList, activeSites, selectedStyles, stylePrices, canEdit, onEditClick }) {
+  const stylesList = [...selectedStyles];
+
   return (
     <div style={{ padding: '0 16px 24px' }}>
-      {/* Active sites with prices */}
+      {/* Active sites — names only, no prices */}
       <div className="list-section-title" style={{ marginBottom: 8 }}>
-        Сайты {activeSites.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({activeSites.length})</span>}
+        Сайты{activeSites.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({activeSites.length})</span>}
       </div>
       {activeSites.length > 0 ? (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
           {activeSites.map(s => (
-            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 14 }}>{s.label}</span>
-              {s.price
-                ? <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--green)' }}>€{s.price}</span>
-                : <span style={{ fontSize: 12, color: 'var(--text3)' }}>—</span>
-              }
-            </div>
+            <span key={s.id} style={{
+              fontSize: 12, background: 'var(--bg3)', color: 'var(--text2)',
+              borderRadius: 8, padding: '4px 10px',
+            }}>
+              {s.label}
+            </span>
           ))}
         </div>
       ) : (
         <div style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 16 }}>Сайты не указаны</div>
       )}
 
-      {/* Styles */}
+      {/* Styles with prices */}
       <div className="list-section-title" style={{ marginBottom: 8 }}>
-        Стили {selectedStyles.size > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({selectedStyles.size})</span>}
+        Стили{stylesList.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({stylesList.length})</span>}
       </div>
-      {selectedStyles.size > 0 ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-          {[...selectedStyles].map(s => (
-            <span key={s} style={{
-              fontSize: 12, background: 'var(--accent-bg)', color: 'var(--accent)',
-              borderRadius: 6, padding: '4px 10px', fontWeight: 500,
+      {stylesList.length > 0 ? (
+        <div className="card" style={{ marginBottom: 16 }}>
+          {stylesList.map(s => (
+            <div key={s} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '10px 16px', borderBottom: '1px solid var(--border)',
             }}>
-              {s}
-            </span>
+              <span style={{ fontSize: 14 }}>{s}</span>
+              {stylePrices[s]
+                ? <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--green)' }}>€{stylePrices[s]}</span>
+                : <span style={{ fontSize: 12, color: 'var(--text3)' }}>—</span>
+              }
+            </div>
           ))}
         </div>
       ) : (
