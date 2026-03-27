@@ -145,6 +145,7 @@ export default function CalendarView({ shoots, canEdit, onShootUpdated }) {
                   <div className="shoot-item-meta">
                     <span>{new Date(s.shoot_date).toLocaleDateString()}</span>
                     {s.location && <span>{s.location}</span>}
+                    {s.rate && <span style={{ color: 'var(--green)', fontWeight: 600 }}>€{parseFloat(s.rate) % 1 === 0 ? parseInt(s.rate) : parseFloat(s.rate).toFixed(0)}</span>}
                   </div>
                 </div>
               ))
