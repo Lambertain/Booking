@@ -21,7 +21,13 @@ export default {
     unknownRole: 'Неизвестная роль',
   },
 
+  back: '‹ Назад',
+
   nav: {
+    models: 'Модели',
+    chats: 'Чаты',
+    clients: 'Клиенты',
+    settings: 'Настр.',
     shoots: '🎬 Съёмки',
     conversations: '💬 Чаты',
     users: '👥 Пользователи',
@@ -43,6 +49,10 @@ export default {
     notes: 'Заметки',
     all: 'Все',
     empty: 'Съёмок нет',
+    calendar: 'Календарь',
+    list: 'Список',
+    upcoming: 'Ближайшие',
+    noUpcoming: 'Нет ближайших съёмок',
     statusLabels: {
       negotiating: 'Переговоры',
       confirmed: 'Подтверждено',
@@ -72,8 +82,62 @@ export default {
     block: 'Блок',
     unblock: 'Разблок',
     create: 'Создать',
+    register: 'Регистрация',
     slugHint: 'Slug (напр. ana-v)',
     telegramId: 'Telegram ID',
     password: 'Пароль',
+  },
+
+  models: {
+    empty: 'Моделей нет',
+  },
+
+  clients: {
+    title: 'Клиенты',
+    empty: 'Клиентов нет',
+    tabs: {
+      mailings: 'Рассылки',
+      templates: 'Шаблоны',
+    },
+  },
+
+  mailings: {
+    title: 'Рассылки',
+    empty: 'Заказов нет',
+    newOrder: 'Новый заказ',
+    sites: 'Сайты',
+    regions: 'Регионы',
+    genres: 'Жанры',
+    volume: 'Объём',
+    price: 'Цена',
+    statusLabels: {
+      new: 'Новый',
+      in_progress: 'В работе',
+      done: 'Выполнено',
+      cancelled: 'Отменено',
+    },
+  },
+
+  templates: {
+    title: 'Шаблоны',
+    empty: 'Шаблонов нет',
+    newTemplate: 'Новый шаблон',
+    name: 'Название',
+    content: 'Текст шаблона',
+    sites: 'Сайты',
+  },
+
+  settings: {
+    title: 'Настройки',
+    language: 'Язык',
+    theme: 'Тема',
+    themeLight: 'Светлая',
+    themeDark: 'Тёмная',
+    impersonate: 'Просмотр от имени',
+    impersonateHint: 'Переключиться на роль другого пользователя',
+    exitImpersonate: 'Выйти из режима просмотра',
+    selectUser: 'Выберите пользователя...',
+    account: 'Аккаунт',
+    logout: 'Выйти',
   },
 };

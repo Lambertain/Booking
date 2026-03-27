@@ -17,10 +17,18 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         [id]
       );
     } else {
-      rows = await all(
-        `SELECT id, role, name, email, telegram_username, is_active, created_at FROM users ORDER BY created_at`,
-        []
-      );
+      const roleFilter = req.query.role;
+      if (roleFilter) {
+        rows = await all(
+          `SELECT id, role, name, email, telegram_username, is_active, created_at FROM users WHERE role = $1 ORDER BY created_at`,
+          [roleFilter]
+        );
+      } else {
+        rows = await all(
+          `SELECT id, role, name, email, telegram_username, is_active, created_at FROM users ORDER BY created_at`,
+          []
+        );
+      }
     }
     res.json(rows);
   } catch (err) {

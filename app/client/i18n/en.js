@@ -21,7 +21,13 @@ export default {
     unknownRole: 'Unknown role',
   },
 
+  back: '‹ Back',
+
   nav: {
+    models: 'Models',
+    chats: 'Chats',
+    clients: 'Clients',
+    settings: 'Settings',
     shoots: '🎬 Shoots',
     conversations: '💬 Chats',
     users: '👥 Users',
@@ -43,6 +49,10 @@ export default {
     notes: 'Notes',
     all: 'All',
     empty: 'No shoots',
+    calendar: 'Calendar',
+    list: 'List',
+    upcoming: 'Upcoming',
+    noUpcoming: 'No upcoming shoots',
     statusLabels: {
       negotiating: 'Negotiating',
       confirmed: 'Confirmed',
@@ -72,8 +82,62 @@ export default {
     block: 'Block',
     unblock: 'Unblock',
     create: 'Create',
+    register: 'Register',
     slugHint: 'Slug (e.g. ana-v)',
     telegramId: 'Telegram ID',
     password: 'Password',
+  },
+
+  models: {
+    empty: 'No models',
+  },
+
+  clients: {
+    title: 'Clients',
+    empty: 'No clients',
+    tabs: {
+      mailings: 'Mailings',
+      templates: 'Templates',
+    },
+  },
+
+  mailings: {
+    title: 'Mailings',
+    empty: 'No orders',
+    newOrder: 'New order',
+    sites: 'Sites',
+    regions: 'Regions',
+    genres: 'Genres',
+    volume: 'Volume',
+    price: 'Price',
+    statusLabels: {
+      new: 'New',
+      in_progress: 'In progress',
+      done: 'Done',
+      cancelled: 'Cancelled',
+    },
+  },
+
+  templates: {
+    title: 'Templates',
+    empty: 'No templates',
+    newTemplate: 'New template',
+    name: 'Name',
+    content: 'Template text',
+    sites: 'Sites',
+  },
+
+  settings: {
+    title: 'Settings',
+    language: 'Language',
+    theme: 'Theme',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    impersonate: 'View as user',
+    impersonateHint: 'Switch to another user\'s role to preview their UI',
+    exitImpersonate: 'Exit preview mode',
+    selectUser: 'Select user...',
+    account: 'Account',
+    logout: 'Logout',
   },
 };

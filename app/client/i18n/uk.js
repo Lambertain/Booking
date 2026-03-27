@@ -24,7 +24,13 @@ export default {
   },
 
   // Nav
+  back: '‹ Назад',
+
   nav: {
+    models: 'Моделі',
+    chats: 'Чати',
+    clients: 'Клієнти',
+    settings: 'Налашт.',
     shoots: '🎬 Зйомки',
     conversations: '💬 Чати',
     users: '👥 Користувачі',
@@ -47,6 +53,10 @@ export default {
     notes: 'Нотатки',
     all: 'Усі',
     empty: 'Зйомок немає',
+    calendar: 'Календар',
+    list: 'Список',
+    upcoming: 'Найближчі',
+    noUpcoming: 'Немає найближчих зйомок',
     statusLabels: {
       negotiating: 'Переговори',
       confirmed: 'Підтверджено',
@@ -78,8 +88,62 @@ export default {
     block: 'Блок',
     unblock: 'Розблок',
     create: 'Створити',
+    register: 'Реєстрація',
     slugHint: 'Slug (напр. ana-v)',
     telegramId: 'Telegram ID',
     password: 'Пароль',
+  },
+
+  models: {
+    empty: 'Моделей немає',
+  },
+
+  clients: {
+    title: 'Клієнти',
+    empty: 'Клієнтів немає',
+    tabs: {
+      mailings: 'Розсилки',
+      templates: 'Шаблони',
+    },
+  },
+
+  mailings: {
+    title: 'Розсилки',
+    empty: 'Замовлень немає',
+    newOrder: 'Нове замовлення',
+    sites: 'Сайти',
+    regions: 'Регіони',
+    genres: 'Жанри',
+    volume: 'Об\'єм',
+    price: 'Ціна',
+    statusLabels: {
+      new: 'Нове',
+      in_progress: 'В роботі',
+      done: 'Виконано',
+      cancelled: 'Скасовано',
+    },
+  },
+
+  templates: {
+    title: 'Шаблони',
+    empty: 'Шаблонів немає',
+    newTemplate: 'Новий шаблон',
+    name: 'Назва',
+    content: 'Текст шаблону',
+    sites: 'Сайти',
+  },
+
+  settings: {
+    title: 'Налаштування',
+    language: 'Мова',
+    theme: 'Тема',
+    themeLight: 'Світла',
+    themeDark: 'Темна',
+    impersonate: 'Перегляд від імені',
+    impersonateHint: 'Переключитись на роль іншого користувача',
+    exitImpersonate: 'Вийти з режиму перегляду',
+    selectUser: 'Оберіть користувача...',
+    account: 'Акаунт',
+    logout: 'Вийти',
   },
 };

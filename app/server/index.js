@@ -19,6 +19,9 @@ app.use('/api/shoots',        require('./routes/shoots'));
 app.use('/api/conversations', require('./routes/conversations'));
 app.use('/api/users',         require('./routes/users'));
 app.use('/api/sync',          require('./routes/sync'));
+app.use('/api/media',         require('./routes/media'));
+app.use('/api/orders',        require('./routes/orders'));
+app.use('/api/templates',     require('./routes/templates'));
 
 // Serve React build in production
 const distDir = path.join(__dirname, '../dist');
