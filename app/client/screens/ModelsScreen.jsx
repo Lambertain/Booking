@@ -11,25 +11,28 @@ export default function ModelsScreen({ user }) {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // For model role — only show own profile
   const isModel = user.role === 'model';
 
   useEffect(() => {
-    const modelsUrl = isModel ? '/api/users?role=model' : '/api/users?role=model';
-    Promise.all([
-      api.get(modelsUrl),
-      api.get('/api/shoots'),
-    ]).then(([u, s]) => {
-      // Filter out users without proper agency_models entry (no slug)
-      const valid = u.filter(m => m.slug || m.display_name || m.name !== 'ana-v');
-      setModels(valid);
-      setShoots(s);
-      // Model role: auto-open own profile
-      if (isModel) {
-        const own = valid.find(m => m.id === user.id);
-        if (own) setSelected(own);
-      }
-    }).finally(() => setLoading(false));
+    if (isModel) {
+      // Model sees only own shoots — no models list
+      Promise.all([
+        api.get('/api/auth/me'),
+        api.get('/api/shoots'),
+      ]).then(([meData, s]) => {
+        const me = meData.user;
+        setShoots(s);
+        setSelected(me);
+      }).finally(() => setLoading(false));
+    } else {
+      Promise.all([
+        api.get('/api/users?role=model'),
+        api.get('/api/shoots'),
+      ]).then(([u, s]) => {
+        setModels(u.filter(m => m.slug));
+        setShoots(s);
+      }).finally(() => setLoading(false));
+    }
   }, []);
 
   if (selected) {
