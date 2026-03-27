@@ -10,6 +10,9 @@ const PORT = process.env.APP_PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Health check
+app.get('/health', (req, res) => res.json({ ok: true }));
+
 // API routes
 app.use('/api/auth',          require('./routes/auth'));
 app.use('/api/shoots',        require('./routes/shoots'));
