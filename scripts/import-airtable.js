@@ -21,12 +21,12 @@ const TABLE_PHOTOGRAPHERS = 'tblzr47aNJxLv1hcz';
 const STATUS_MAP = {
   'Реализована':         'done',
   'Утверждена':          'confirmed',
-  'Резерв':              'negotiating',
-  'День расписан':       'confirmed',
+  'Резерв':              'reserve',
+  'День расписан':       'day_scheduled',
   'Моя работа':          'negotiating',
-  'Отменена фотографом': 'cancelled',
-  'Отменена моделью':    'cancelled',
-  'Отменена агентством': 'cancelled',
+  'Отменена фотографом': 'cancelled_photographer',
+  'Отменена моделью':    'cancelled_model',
+  'Отменена агентством': 'cancelled_agency',
 };
 
 async function atGetAll(baseId, tableId) {

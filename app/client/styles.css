@@ -294,11 +294,16 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 3px 9px; border-radius: 20px;
   font-size: 12px; font-weight: 600;
 }
-.badge-negotiating { background: rgba(255,159,10,0.15); color: var(--orange); }
-.badge-confirmed   { background: rgba(48,209,88,0.15);  color: var(--green); }
-.badge-done        { background: rgba(10,132,255,0.15);  color: var(--accent); }
-.badge-cancelled   { background: rgba(255,69,58,0.15);   color: var(--red); }
-.badge-new         { background: rgba(191,90,242,0.15);  color: var(--purple); }
+.badge-negotiating            { background: rgba(255,159,10,0.15);  color: var(--orange); }
+.badge-reserve                { background: rgba(100,210,255,0.15); color: #5ac8fa; }
+.badge-day_scheduled          { background: rgba(191,90,242,0.15);  color: var(--purple); }
+.badge-confirmed              { background: rgba(48,209,88,0.15);   color: var(--green); }
+.badge-done                   { background: rgba(10,132,255,0.15);  color: var(--accent); }
+.badge-cancelled              { background: rgba(255,69,58,0.15);   color: var(--red); }
+.badge-cancelled_photographer { background: rgba(255,69,58,0.15);   color: var(--red); }
+.badge-cancelled_model        { background: rgba(255,69,58,0.15);   color: var(--red); }
+.badge-cancelled_agency       { background: rgba(255,69,58,0.15);   color: var(--red); }
+.badge-new                    { background: rgba(191,90,242,0.15);  color: var(--purple); }
 
 /* ── Segmented Control ── */
 .segmented {

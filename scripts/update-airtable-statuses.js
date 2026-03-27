@@ -20,6 +20,10 @@ const CANCELLED = new Set([
   'Отменена фотографом',
   'Отменена моделью',
   'Отменена агентством',
+  'cancelled_photographer',
+  'cancelled_model',
+  'cancelled_agency',
+  'cancelled',
 ]);
 
 const TODAY = new Date().toISOString().slice(0, 10);

@@ -3,7 +3,7 @@ import { useLang } from '../i18n/useLang.js';
 import Sheet from './Sheet.jsx';
 import { api } from '../api.js';
 
-const STATUSES = ['negotiating', 'confirmed', 'done', 'cancelled'];
+const STATUSES = ['negotiating', 'reserve', 'day_scheduled', 'confirmed', 'done', 'cancelled', 'cancelled_photographer', 'cancelled_model', 'cancelled_agency'];
 
 export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) {
   const { t } = useLang();
