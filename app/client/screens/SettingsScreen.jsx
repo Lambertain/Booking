@@ -271,10 +271,11 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
             <span style={{ fontSize: 15 }}>
               {theme === 'dark' ? t('settings.themeDark') : t('settings.themeLight')}
             </span>
-            <label className="toggle">
-              <input type="checkbox" checked={theme === 'dark'} onChange={toggleTheme} />
-              <span className="toggle-track" />
-            </label>
+            <button
+              className={`toggle${theme === 'dark' ? ' on' : ''}`}
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            />
           </div>
         </div>
       </div>
