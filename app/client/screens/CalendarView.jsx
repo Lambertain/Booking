@@ -4,6 +4,10 @@ import ShootSheet from '../components/ShootSheet.jsx';
 
 const DAY_NAMES = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
+function localDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function CalendarView({ shoots, canEdit, onShootUpdated }) {
   const { t, lang } = useLang();
   const [date, setDate] = useState(new Date());
@@ -45,8 +49,8 @@ export default function CalendarView({ shoots, canEdit, onShootUpdated }) {
     shootsByDate[key].push(s);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const selectedKey = selectedDay?.toISOString().slice(0, 10);
+  const today = localDateKey(new Date());
+  const selectedKey = selectedDay ? localDateKey(selectedDay) : null;
   const selectedShoots = selectedKey ? (shootsByDate[selectedKey] || []) : [];
 
   return (
@@ -61,7 +65,7 @@ export default function CalendarView({ shoots, canEdit, onShootUpdated }) {
         <div className="calendar-grid">
           {DAY_NAMES.map(d => <div key={d} className="cal-day-header">{d}</div>)}
           {days.map((d, i) => {
-            const key = d.date.toISOString().slice(0, 10);
+            const key = localDateKey(d.date);
             const isToday = key === today;
             const count = (shootsByDate[key] || []).length;
             const isSelected = key === selectedKey;
@@ -76,17 +80,16 @@ export default function CalendarView({ shoots, canEdit, onShootUpdated }) {
                 {count > 0 && d.thisMonth && (
                   <span style={{
                     position: 'absolute',
-                    top: 0, right: 0,
-                    minWidth: 16, height: 16,
-                    borderRadius: 8,
-                    background: isToday ? '#fff' : 'var(--green)',
-                    color: isToday ? 'var(--accent)' : '#fff',
-                    fontSize: 9,
+                    top: 1, right: 1,
+                    minWidth: 17, height: 17,
+                    borderRadius: '50%',
+                    background: '#30d158',
+                    color: '#fff',
+                    fontSize: 10,
                     fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '0 3px',
                     lineHeight: 1,
                   }}>{count}</span>
                 )}

@@ -38,11 +38,14 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`[app] Server running on port ${PORT}`);
   });
-  // Register Telegram webhook if APP_URL is set
+  // Register Telegram webhook
   const { registerWebhook } = require('./routes/bot');
-  const appUrl = process.env.APP_URL || process.env.RAILWAY_STATIC_URL;
+  const appUrl = process.env.APP_URL
+    || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
   if (appUrl) {
     registerWebhook(appUrl.replace(/\/$/, ''));
+  } else {
+    console.log('[bot] APP_URL not set — webhook not registered');
   }
 }
 

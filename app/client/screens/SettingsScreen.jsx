@@ -90,6 +90,10 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
     }
   }
 
+  const ROLE_TABS = ['all', 'admin', 'manager', 'model', 'client', 'user'];
+  const [roleTab, setRoleTab] = useState('all');
+  const filteredUsers = roleTab === 'all' ? users : users.filter(u => u.role === roleTab);
+
   if (usersView) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -102,14 +106,35 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
             </button>
           }
         />
-        <div style={{ flex: 1, overflowY: 'auto', paddingTop: 'var(--topbar-h)', padding: 'var(--topbar-h) 16px 24px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--topbar-h) 16px 32px' }}>
+          {/* Role tabs */}
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' }}>
+            {ROLE_TABS.map(r => (
+              <button
+                key={r}
+                onClick={() => setRoleTab(r)}
+                style={{
+                  flexShrink: 0, padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
+                  background: roleTab === r ? 'var(--accent)' : 'var(--bg3)',
+                  color: roleTab === r ? '#fff' : 'var(--text2)',
+                  fontWeight: roleTab === r ? 600 : 400,
+                }}
+              >
+                {r === 'all' ? `All (${users.length})` : `${r.charAt(0).toUpperCase() + r.slice(1)} (${users.filter(u => u.role === r).length})`}
+              </button>
+            ))}
+          </div>
+
           {loadingUsers ? (
             <div className="loader"><div className="spinner" /></div>
           ) : (
             <div className="card">
-              {users.map(u => (
+              {filteredUsers.length === 0 && (
+                <div className="list-item" style={{ color: 'var(--text3)', fontSize: 13, justifyContent: 'center' }}>Нет пользователей</div>
+              )}
+              {filteredUsers.map(u => (
                 <div key={u.id} className="list-item">
-                  <Avatar name={u.name || u.telegram_username || '?'} size={40} />
+                  <Avatar name={u.name || u.telegram_username || '?'} size={40} src={u.photo_url} />
                   <div className="list-item-body">
                     <div className="list-item-title" style={{ opacity: u.is_active ? 1 : 0.4 }}>
                       {u.name || '—'}

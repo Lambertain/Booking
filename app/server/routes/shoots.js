@@ -71,7 +71,8 @@ router.post('/', requireAuth('admin', 'manager'), async (req, res) => {
 router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
   try {
     const fields = ['photographer_name','photographer_site','dialog_url','shoot_date',
-                    'location','rate','currency','status','notes'];
+                    'location','rate','currency','status','notes',
+                    'photographer_email','photographer_phone','photographer_telegram'];
     const updates = [];
     const vals = [];
     let i = 1;

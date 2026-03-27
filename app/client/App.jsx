@@ -127,8 +127,8 @@ export default function App() {
   const tabs = [];
   if (effectiveRole === 'admin' || effectiveRole === 'manager') {
     tabs.push({ key: 'models',   icon: Icons.models,   label: t('nav.models') });
-    tabs.push({ key: 'chats',    icon: Icons.chats,    label: t('nav.chats') });
     tabs.push({ key: 'clients',  icon: Icons.clients,  label: t('nav.clients') });
+    tabs.push({ key: 'chats',    icon: Icons.chats,    label: t('nav.chats') });
     tabs.push({ key: 'settings', icon: Icons.settings, label: t('nav.settings') });
   } else if (effectiveRole === 'model') {
     tabs.push({ key: 'models',   icon: Icons.myshoot,  label: t('nav.myShoot2') });
