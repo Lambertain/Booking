@@ -224,7 +224,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
                   fontSize: 11, color: 'var(--red)', fontWeight: 600,
                   background: 'rgba(255,69,58,0.12)', borderRadius: 20, padding: '3px 8px',
                 }}>
-                  ● {nearestEndingSoon && hasPlannedTour ? 'Тур заканчивается, добавь следующий' : 'Нет тура на след. месяц'}
+                  ● {nearestEndingSoon && hasPlannedTour ? 'Тур скоро начинается — запланируй следующий' : 'Нет тура на след. месяц'}
                 </span>
               )}
             </div>
