@@ -65,10 +65,16 @@ export default function ModelsScreen({ user }) {
           const modelShoots = shoots.filter(s => s.model_id === m.id && s.status !== 'cancelled');
           const upcomingShoots = modelShoots.filter(s => s.shoot_date && new Date(s.shoot_date) >= now);
 
-          const totalSum  = modelShoots.reduce((acc, s) => acc + (parseFloat(s.rate) || 0), 0);
-          const upcomingSum = upcomingShoots.reduce((acc, s) => acc + (parseFloat(s.rate) || 0), 0);
+          const ratedAll      = modelShoots.filter(s => s.rate);
+          const ratedUpcoming = upcomingShoots.filter(s => s.rate);
+          const totalSum      = ratedAll.reduce((acc, s) => acc + parseFloat(s.rate), 0);
+          const upcomingSum   = ratedUpcoming.reduce((acc, s) => acc + parseFloat(s.rate), 0);
 
-          const fmt = v => v > 0 ? ` · €${v % 1 === 0 ? v : v.toFixed(0)}` : '';
+          const fmtSum = (sum, ratedCnt, totalCnt) => {
+            if (ratedCnt === 0) return '';
+            const val = `€${Math.round(sum)}`;
+            return ratedCnt < totalCnt ? ` · ~${val}` : ` · ${val}`;
+          };
 
           return (
             <div key={m.id} className="model-card" onClick={() => setSelected(m)}>
@@ -76,11 +82,11 @@ export default function ModelsScreen({ user }) {
               <div className="model-card-info">
                 <div className="model-card-name">{m.display_name || m.name}</div>
                 <div className="model-card-stats">
-                  <span>{modelShoots.length} {t('shoots.title').toLowerCase()}{fmt(totalSum)}</span>
+                  <span>{modelShoots.length} {t('shoots.title').toLowerCase()}{fmtSum(totalSum, ratedAll.length, modelShoots.length)}</span>
                 </div>
                 {upcomingShoots.length > 0 && (
                   <div className="model-card-stats" style={{ color: 'var(--green)', marginTop: 1 }}>
-                    {upcomingShoots.length} {t('shoots.upcoming')}{fmt(upcomingSum)}
+                    {upcomingShoots.length} {t('shoots.upcoming')}{fmtSum(upcomingSum, ratedUpcoming.length, upcomingShoots.length)}
                   </div>
                 )}
               </div>
