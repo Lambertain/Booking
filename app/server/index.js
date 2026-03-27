@@ -22,6 +22,7 @@ app.use('/api/sync',          require('./routes/sync'));
 app.use('/api/media',         require('./routes/media'));
 app.use('/api/orders',        require('./routes/orders'));
 app.use('/api/templates',     require('./routes/templates'));
+app.use('/api/bot',           require('./routes/bot').router);
 
 // Serve React build in production
 const distDir = path.join(__dirname, '../dist');
@@ -37,6 +38,12 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`[app] Server running on port ${PORT}`);
   });
+  // Register Telegram webhook if APP_URL is set
+  const { registerWebhook } = require('./routes/bot');
+  const appUrl = process.env.APP_URL || process.env.RAILWAY_STATIC_URL;
+  if (appUrl) {
+    registerWebhook(appUrl.replace(/\/$/, ''));
+  }
 }
 
 start().catch(err => {

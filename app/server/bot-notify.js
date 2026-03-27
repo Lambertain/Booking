@@ -23,6 +23,21 @@ function tgPost(method, body) {
   });
 }
 
+// Forward app message to user in Telegram (if they have telegram_id)
+async function forwardToTelegram(recipientId, senderName, text) {
+  if (!BOT_TOKEN) return;
+  try {
+    const { one } = require('./db');
+    const recipient = await one('SELECT telegram_id FROM users WHERE id = $1', [recipientId]);
+    if (!recipient?.telegram_id) return;
+    await tgPost('sendMessage', {
+      chat_id: recipient.telegram_id,
+      text: `💬 <b>${senderName}</b>:\n${text}`,
+      parse_mode: 'HTML',
+    });
+  } catch {}
+}
+
 // New message from client/model in mini app → send to appropriate Telegram chat
 async function notifyNewMessage(conv, msg, sender) {
   if (!BOT_TOKEN) return;

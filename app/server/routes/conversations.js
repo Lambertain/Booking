@@ -100,10 +100,15 @@ router.post('/:id/messages', requireAuth(), async (req, res) => {
       [conv.id]
     );
 
-    // Notify via Telegram if sender is model/client
-    if (role === 'model' || role === 'client') {
-      const { notifyNewMessage } = require('../bot-notify');
+    const { notifyNewMessage, forwardToTelegram } = require('../bot-notify');
+
+    if (role === 'model' || role === 'client' || role === 'user') {
+      // User-side message → notify managers in Telegram
       notifyNewMessage(conv, msg, req.user).catch(() => {});
+    } else {
+      // Manager/admin reply → forward to the other participant in Telegram
+      const recipientId = conv.participant_a === userId ? conv.participant_b : conv.participant_a;
+      forwardToTelegram(recipientId, req.user.name, text.trim()).catch(() => {});
     }
 
     res.status(201).json(msg);
