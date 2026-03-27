@@ -38,7 +38,13 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`[app] Server running on port ${PORT}`);
   });
-  // Telegram webhook is NOT registered here — booking bot uses polling on Windows Server
+  // Register webhook for mini-app bot (separate token from booking bot on Windows Server)
+  const { registerWebhook } = require('./routes/bot');
+  const appUrl = process.env.APP_URL
+    || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
+  if (appUrl) {
+    registerWebhook(appUrl.replace(/\/$/, ''));
+  }
 }
 
 start().catch(err => {
