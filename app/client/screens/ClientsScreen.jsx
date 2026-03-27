@@ -50,8 +50,8 @@ export default function ClientsScreen({ user }) {
 
   return (
     <div className="screen">
-      <div style={{ padding: '0 16px', paddingTop: 'calc(var(--topbar-h) + 16px)' }}>
-        <h1 style={{ margin: '16px 0' }}>{t('clients.title')}</h1>
+      <div style={{ padding: '16px 16px 8px' }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('clients.title')}</h1>
       </div>
 
       <div style={{ padding: '0 16px 8px' }}>

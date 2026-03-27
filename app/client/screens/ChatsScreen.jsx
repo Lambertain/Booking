@@ -35,8 +35,8 @@ export default function ChatsScreen({ user }) {
 
   return (
     <div className="screen">
-      <div style={{ paddingTop: 'calc(var(--topbar-h) + 16px)', padding: '0 16px' }}>
-        <h1 style={{ margin: '16px 0 16px', paddingTop: 'var(--topbar-h)' }}>{t('nav.chats')}</h1>
+      <div style={{ padding: '16px 16px 8px' }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('nav.chats')}</h1>
       </div>
       <div className="card" style={{ margin: '0 16px' }}>
         {convs.length === 0 ? (

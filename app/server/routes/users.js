@@ -18,7 +18,29 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
       );
     } else {
       const roleFilter = req.query.role;
-      if (roleFilter) {
+      const managerFilter = req.query.manager_id;
+      if (roleFilter === 'model' && managerFilter) {
+        rows = await all(
+          `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active,
+                  am.slug, am.display_name
+           FROM users u
+           LEFT JOIN agency_models am ON am.user_id = u.id
+           JOIN manager_models mm ON mm.model_id = u.id
+           WHERE u.role = 'model' AND mm.manager_id = $1
+           ORDER BY u.name`,
+          [managerFilter]
+        );
+      } else if (roleFilter === 'model') {
+        rows = await all(
+          `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active, u.created_at,
+                  am.slug, am.display_name, am.city, am.instagram, am.rates, am.sites_json, am.tours_json, am.portfolio_url
+           FROM users u
+           LEFT JOIN agency_models am ON am.user_id = u.id
+           WHERE u.role = 'model' AND u.is_active = TRUE AND am.slug IS NOT NULL
+           ORDER BY u.created_at`,
+          []
+        );
+      } else if (roleFilter) {
         rows = await all(
           `SELECT id, role, name, email, telegram_username, is_active, created_at FROM users WHERE role = $1 ORDER BY created_at`,
           [roleFilter]
@@ -90,6 +112,51 @@ router.patch('/:id', requireAuth('admin'), async (req, res) => {
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     vals.push(req.params.id);
     const row = await one(`UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, role, name, email, is_active`, vals);
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/users/:id/profile — update model profile (admin, manager, or the model itself)
+router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (req, res) => {
+  try {
+    const { display_name, city, instagram, rates, sites_json, tours_json } = req.body;
+    const { role, id: callerId } = req.user;
+    const targetId = parseInt(req.params.id);
+
+    // Models can only edit their own profile
+    if (role === 'model' && callerId !== targetId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const updates = [];
+    const vals = [];
+    let i = 1;
+    if (display_name !== undefined) { updates.push(`display_name = $${i++}`); vals.push(display_name); }
+    if (city !== undefined)         { updates.push(`city = $${i++}`);         vals.push(city); }
+    if (instagram !== undefined)    { updates.push(`instagram = $${i++}`);    vals.push(instagram); }
+    if (rates !== undefined)        { updates.push(`rates = $${i++}`);        vals.push(rates); }
+    if (sites_json !== undefined)   { updates.push(`sites_json = $${i++}`);   vals.push(JSON.stringify(sites_json)); }
+    if (tours_json !== undefined)   { updates.push(`tours_json = $${i++}`);   vals.push(JSON.stringify(tours_json)); }
+
+    if (display_name !== undefined) {
+      await query('UPDATE users SET name = $1 WHERE id = $2', [display_name, targetId]);
+    }
+
+    if (updates.length) {
+      vals.push(targetId);
+      await query(
+        `UPDATE agency_models SET ${updates.join(', ')} WHERE user_id = $${i}`,
+        vals
+      );
+    }
+
+    const row = await one(
+      `SELECT u.id, u.name, u.telegram_username, am.display_name, am.city, am.instagram, am.rates, am.sites_json, am.tours_json, am.slug
+       FROM users u LEFT JOIN agency_models am ON am.user_id = u.id WHERE u.id = $1`,
+      [targetId]
+    );
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });

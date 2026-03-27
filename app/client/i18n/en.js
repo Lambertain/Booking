@@ -25,6 +25,7 @@ export default {
 
   nav: {
     models: 'Models',
+    myShoot2: 'Shoots',
     chats: 'Chats',
     clients: 'Clients',
     settings: 'Settings',

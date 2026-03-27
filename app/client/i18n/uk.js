@@ -28,9 +28,10 @@ export default {
 
   nav: {
     models: 'Моделі',
+    myShoot2: 'Зйомки',
     chats: 'Чати',
     clients: 'Клієнти',
-    settings: 'Налашт.',
+    settings: 'Настройки',
     shoots: '🎬 Зйомки',
     conversations: '💬 Чати',
     users: '👥 Користувачі',

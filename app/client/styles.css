@@ -85,8 +85,15 @@ h3 { font-size: 17px; font-weight: 600; }
 .screen {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: var(--tab-h);
+  padding-bottom: 24px;
+}
+
+/* Sub-screens with fixed TopBar */
+.screen-with-topbar {
+  flex: 1;
+  overflow-y: auto;
   padding-top: var(--topbar-h);
+  padding-bottom: 24px;
 }
 
 .screen-content { padding: 0 16px 24px; }
@@ -175,8 +182,9 @@ h3 { font-size: 17px; font-weight: 600; }
   position: relative;
 }
 .tab-item.active { color: var(--accent); }
-.tab-icon { font-size: 22px; line-height: 1; }
-.tab-label { font-size: 10px; font-weight: 500; }
+.tab-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.tab-icon svg { width: 24px; height: 24px; }
+.tab-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1px; }
 .tab-badge {
   position: absolute;
   top: 6px;
