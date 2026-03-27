@@ -159,22 +159,6 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       <TopBar
         title={profile.display_name || model.name}
-        left={onBack ? <button className="back-btn" onClick={onBack}>‹ {t('back')}</button> : null}
-        right={canEdit && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              onClick={() => setCreateShoot(true)}
-              style={{
-                width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                background: 'var(--accent)', color: '#fff', fontSize: 22, lineHeight: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 300,
-              }}
-            >+</button>
-            <button className="btn btn-sm btn-secondary" onClick={() => setEditSheet(true)}>
-              {t('edit')}
-            </button>
-          </div>
-        )}
       />
 
       <div style={{ flex: 1, overflowY: 'auto', paddingTop: 'var(--topbar-h)', paddingBottom: 'var(--tabbar-h)' }}>
@@ -196,13 +180,6 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
           </div>
         </div>
 
-        {/* Rates */}
-        {profile.rates && (
-          <div style={{ padding: '0 16px 8px', fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
-            {profile.rates}
-          </div>
-        )}
-
         {/* Upcoming tours */}
         {upcomingTours.length > 0 && (
           <div style={{ padding: '0 16px 8px' }}>
@@ -222,13 +199,37 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
             </div>
           </div>
         )}
-        {canEdit && (
-          <div style={{ padding: '0 16px 8px' }}>
-            <button className="btn btn-secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTourSheet(true)}>
-              + Тур
-            </button>
-          </div>
-        )}
+        {canEdit && (() => {
+          const today = new Date();
+          const in30 = new Date(today); in30.setDate(in30.getDate() + 30);
+          const todayStr = today.toISOString().slice(0, 10);
+          const in30Str  = in30.toISOString().slice(0, 10);
+
+          // No tour starting 30+ days from now
+          const hasPlannedTour = tours.some(t => t.date_from >= in30Str);
+          // Nearest upcoming tour ends within 30 days
+          const nearestEndingSoon = tours
+            .filter(t => t.date_to && t.date_to >= todayStr)
+            .some(t => t.date_to <= in30Str);
+
+          const showWarning = !hasPlannedTour || nearestEndingSoon;
+          return (
+            <div style={{ padding: '0 16px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="btn btn-secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTourSheet(true)}>
+                + Тур
+              </button>
+              {showWarning && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 11, color: 'var(--red)', fontWeight: 600,
+                  background: 'rgba(255,69,58,0.12)', borderRadius: 20, padding: '3px 8px',
+                }}>
+                  ● {nearestEndingSoon && hasPlannedTour ? 'Тур заканчивается, добавь следующий' : 'Нет тура на след. месяц'}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Segmented control: Calendar | List | Profile */}
         <div style={{ padding: '8px 16px 0' }}>
@@ -272,6 +273,25 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
           />
         )}
       </div>
+
+      {/* FAB: add shoot */}
+      {canEdit && (
+        <button
+          onClick={() => setCreateShoot(true)}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(var(--tabbar-h) + 16px)',
+            right: 20,
+            width: 52, height: 52, borderRadius: '50%',
+            border: 'none', cursor: 'pointer',
+            background: 'var(--accent)', color: '#fff',
+            fontSize: 28, lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(10,132,255,0.4)',
+            zIndex: 50,
+          }}
+        >+</button>
+      )}
 
       {/* ── Edit profile sheet ── */}
       <Sheet open={editSheet} onClose={() => setEditSheet(false)} title="Редактировать профиль">
