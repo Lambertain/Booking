@@ -61,17 +61,28 @@ export default function ModelsScreen({ user }) {
       </div>
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 24 }}>
         {models.map(m => {
-          const count = shoots.filter(s => s.model_id === m.id).length;
-          const upcoming = shoots.filter(s => s.model_id === m.id && s.shoot_date && new Date(s.shoot_date) >= new Date() && s.status !== 'cancelled').length;
+          const now = new Date();
+          const modelShoots = shoots.filter(s => s.model_id === m.id && s.status !== 'cancelled');
+          const upcomingShoots = modelShoots.filter(s => s.shoot_date && new Date(s.shoot_date) >= now);
+
+          const totalSum  = modelShoots.reduce((acc, s) => acc + (parseFloat(s.rate) || 0), 0);
+          const upcomingSum = upcomingShoots.reduce((acc, s) => acc + (parseFloat(s.rate) || 0), 0);
+
+          const fmt = v => v > 0 ? ` · €${v % 1 === 0 ? v : v.toFixed(0)}` : '';
+
           return (
             <div key={m.id} className="model-card" onClick={() => setSelected(m)}>
               <Avatar name={m.display_name || m.name} size={52} src={m.photo_url} />
               <div className="model-card-info">
                 <div className="model-card-name">{m.display_name || m.name}</div>
                 <div className="model-card-stats">
-                  {count} {t('shoots.title').toLowerCase()}
-                  {upcoming > 0 && <span style={{ color: 'var(--green)' }}> · {upcoming} {t('shoots.upcoming')}</span>}
+                  <span>{modelShoots.length} {t('shoots.title').toLowerCase()}{fmt(totalSum)}</span>
                 </div>
+                {upcomingShoots.length > 0 && (
+                  <div className="model-card-stats" style={{ color: 'var(--green)', marginTop: 1 }}>
+                    {upcomingShoots.length} {t('shoots.upcoming')}{fmt(upcomingSum)}
+                  </div>
+                )}
               </div>
               <span className="chevron" />
             </div>
