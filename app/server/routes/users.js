@@ -68,7 +68,7 @@ router.post('/', requireAuth('admin'), async (req, res) => {
     const hash = password ? await bcrypt.hash(password, 10) : null;
     const user = await one(
       `INSERT INTO users (role, name, email, password_hash, telegram_id, telegram_username)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, role, name, email, telegram_username`,
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, role, name, email, telegram_username, is_active`,
       [role, name, email || null, hash, telegram_id || null, telegram_username || null]
     );
 
