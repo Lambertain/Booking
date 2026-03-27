@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useLang } from '../i18n/useLang.js';
+import ShootSheet from '../components/ShootSheet.jsx';
 
 const DAY_NAMES = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
-export default function CalendarView({ shoots }) {
+export default function CalendarView({ shoots, canEdit, onShootUpdated }) {
   const { t, lang } = useLang();
   const [date, setDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
+  const [detailShoot, setDetailShoot] = useState(null);
 
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -61,16 +63,33 @@ export default function CalendarView({ shoots }) {
           {days.map((d, i) => {
             const key = d.date.toISOString().slice(0, 10);
             const isToday = key === today;
-            const hasShoot = !!shootsByDate[key];
+            const count = (shootsByDate[key] || []).length;
             const isSelected = key === selectedKey;
             return (
               <div
                 key={i}
-                className={`cal-day ${isToday ? 'today' : ''} ${hasShoot ? 'has-shoot' : ''} ${!d.thisMonth ? 'other-month' : ''}`}
+                className={`cal-day ${isToday ? 'today' : ''} ${!d.thisMonth ? 'other-month' : ''}`}
                 style={isSelected && !isToday ? { background: 'var(--accent-bg)', borderRadius: '50%' } : {}}
                 onClick={() => setSelectedDay(d.thisMonth ? d.date : null)}
               >
                 {d.date.getDate()}
+                {count > 0 && d.thisMonth && (
+                  <span style={{
+                    position: 'absolute',
+                    top: 0, right: 0,
+                    minWidth: 16, height: 16,
+                    borderRadius: 8,
+                    background: isToday ? '#fff' : 'var(--green)',
+                    color: isToday ? 'var(--accent)' : '#fff',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 3px',
+                    lineHeight: 1,
+                  }}>{count}</span>
+                )}
               </div>
             );
           })}
@@ -87,15 +106,15 @@ export default function CalendarView({ shoots }) {
             <div style={{ color: 'var(--text2)', fontSize: 14, padding: '8px 0' }}>{t('shoots.empty')}</div>
           ) : (
             <div className="card">
-              {selectedShoots.map((s, i) => (
-                <div key={s.id} className="shoot-item">
+              {selectedShoots.map(s => (
+                <div key={s.id} className="shoot-item" style={{ cursor: 'pointer' }} onClick={() => setDetailShoot(s)}>
                   <div className="shoot-item-top">
                     <span className="shoot-item-name">{s.photographer_name}</span>
                     <span className={`badge badge-${s.status}`}>{t(`shoots.statusLabels.${s.status}`)}</span>
                   </div>
                   <div className="shoot-item-meta">
-                    {s.location && <span>📍 {s.location}</span>}
-                    {s.rate && <span>💶 {s.rate} {s.currency}</span>}
+                    {s.location && <span>{s.location}</span>}
+                    {s.rate && <span>{s.rate} {s.currency}</span>}
                   </div>
                 </div>
               ))}
@@ -113,16 +132,16 @@ export default function CalendarView({ shoots }) {
               .filter(([k]) => k >= today)
               .sort(([a], [b]) => a.localeCompare(b))
               .slice(0, 5)
-              .flatMap(([k, ss]) => ss.map(s => ({ ...s, _key: k })))
+              .flatMap(([, ss]) => ss.map(s => s))
               .map(s => (
-                <div key={s.id} className="shoot-item">
+                <div key={s.id} className="shoot-item" style={{ cursor: 'pointer' }} onClick={() => setDetailShoot(s)}>
                   <div className="shoot-item-top">
                     <span className="shoot-item-name">{s.photographer_name}</span>
                     <span className={`badge badge-${s.status}`}>{t(`shoots.statusLabels.${s.status}`)}</span>
                   </div>
                   <div className="shoot-item-meta">
-                    <span>📅 {new Date(s.shoot_date).toLocaleDateString()}</span>
-                    {s.location && <span>📍 {s.location}</span>}
+                    <span>{new Date(s.shoot_date).toLocaleDateString()}</span>
+                    {s.location && <span>{s.location}</span>}
                   </div>
                 </div>
               ))
@@ -133,6 +152,13 @@ export default function CalendarView({ shoots }) {
           </div>
         </div>
       )}
+
+      <ShootSheet
+        shoot={detailShoot}
+        onClose={() => setDetailShoot(null)}
+        canEdit={canEdit}
+        onShootUpdated={s => { onShootUpdated?.(s); setDetailShoot(null); }}
+      />
     </div>
   );
 }

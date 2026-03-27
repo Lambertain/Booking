@@ -14,6 +14,9 @@ export default function ModelsScreen({ user }) {
   const isModel = user.role === 'model';
 
   useEffect(() => {
+    setSelected(null);
+    setModels([]);
+    setLoading(true);
     if (isModel) {
       // Model sees only own shoots — no models list
       Promise.all([
@@ -33,7 +36,7 @@ export default function ModelsScreen({ user }) {
         setShoots(s);
       }).finally(() => setLoading(false));
     }
-  }, []);
+  }, [isModel]);
 
   if (selected) {
     const modelShoots = shoots.filter(s => s.model_id === selected.id);
@@ -62,7 +65,7 @@ export default function ModelsScreen({ user }) {
           const upcoming = shoots.filter(s => s.model_id === m.id && s.shoot_date && new Date(s.shoot_date) >= new Date() && s.status !== 'cancelled').length;
           return (
             <div key={m.id} className="model-card" onClick={() => setSelected(m)}>
-              <Avatar name={m.display_name || m.name} size={52} />
+              <Avatar name={m.display_name || m.name} size={52} src={m.photo_url} />
               <div className="model-card-info">
                 <div className="model-card-name">{m.display_name || m.name}</div>
                 <div className="model-card-stats">

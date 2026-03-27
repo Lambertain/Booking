@@ -350,15 +350,6 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .cal-day:active { background: var(--bg3); }
 .cal-day.today { background: var(--accent); color: #fff; font-weight: 700; }
-.cal-day.has-shoot::after {
-  content: '';
-  position: absolute;
-  bottom: 3px;
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--green);
-}
-.cal-day.today.has-shoot::after { background: #fff; }
 .cal-day.other-month { color: var(--text3); }
 .cal-nav {
   display: flex; align-items: center; justify-content: space-between;
@@ -560,6 +551,16 @@ textarea { resize: vertical; min-height: 80px; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Detail row (shoot detail sheet) ── */
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.detail-row:last-child { border-bottom: none; }
 
 /* ── Shoot list item ── */
 .shoot-item {

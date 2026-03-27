@@ -32,8 +32,9 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         );
       } else if (roleFilter === 'model') {
         rows = await all(
-          `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active, u.created_at,
-                  am.slug, am.display_name, am.city, am.instagram, am.rates, am.sites_json, am.tours_json, am.portfolio_url
+          `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active, u.created_at, u.photo_url,
+                  am.slug, am.display_name, am.city, am.instagram, am.rates,
+                  am.sites_json, am.tours_json, am.styles_json, am.portfolio_url
            FROM users u
            LEFT JOIN agency_models am ON am.user_id = u.id
            WHERE u.role = 'model' AND u.is_active = TRUE AND am.slug IS NOT NULL
@@ -121,7 +122,7 @@ router.patch('/:id', requireAuth('admin'), async (req, res) => {
 // PATCH /api/users/:id/profile — update model profile (admin, manager, or the model itself)
 router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (req, res) => {
   try {
-    const { display_name, city, instagram, rates, sites_json, tours_json } = req.body;
+    const { display_name, city, instagram, rates, sites_json, tours_json, styles_json } = req.body;
     const { role, id: callerId } = req.user;
     const targetId = parseInt(req.params.id);
 
@@ -139,6 +140,7 @@ router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (re
     if (rates !== undefined)        { updates.push(`rates = $${i++}`);        vals.push(rates); }
     if (sites_json !== undefined)   { updates.push(`sites_json = $${i++}`);   vals.push(JSON.stringify(sites_json)); }
     if (tours_json !== undefined)   { updates.push(`tours_json = $${i++}`);   vals.push(JSON.stringify(tours_json)); }
+    if (styles_json !== undefined)  { updates.push(`styles_json = $${i++}`);  vals.push(JSON.stringify(styles_json)); }
 
     if (display_name !== undefined) {
       await query('UPDATE users SET name = $1 WHERE id = $2', [display_name, targetId]);
@@ -153,7 +155,8 @@ router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (re
     }
 
     const row = await one(
-      `SELECT u.id, u.name, u.telegram_username, am.display_name, am.city, am.instagram, am.rates, am.sites_json, am.tours_json, am.slug
+      `SELECT u.id, u.name, u.telegram_username, u.photo_url, am.display_name, am.city, am.instagram,
+              am.rates, am.sites_json, am.tours_json, am.styles_json, am.slug
        FROM users u LEFT JOIN agency_models am ON am.user_id = u.id WHERE u.id = $1`,
       [targetId]
     );

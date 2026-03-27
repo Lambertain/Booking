@@ -129,7 +129,7 @@ router.get('/:id/events', requireAuth(), async (req, res) => {
 });
 
 // POST /api/conversations — create or get existing
-router.post('/', requireAuth('admin', 'manager'), async (req, res) => {
+router.post('/', requireAuth('admin', 'manager', 'model', 'client', 'user'), async (req, res) => {
   try {
     const { participant_a, participant_b, type } = req.body;
     const a = Math.min(participant_a, participant_b);

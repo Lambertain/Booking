@@ -147,14 +147,35 @@ app/
 └── Dockerfile (для Railway)
 ```
 
+## Railway (мини-апп) — IDs та credentials
+- API Token: `6f04a384-b4bd-4c8a-be9b-3d8286850c8d`
+- Project ID: `700e9228-90e0-4904-91a5-37a1800dd8d6`
+- Environment ID: `dadc52ef-2262-43e2-9908-adee83e0dde5`
+- App Service ID: `c3eddc3e-e497-4efc-8e97-db2b89e26f74`
+- Postgres Service ID: `3e9366a4-a6ec-4a5b-ad73-a567f284cd79`
+- App URL: `https://booking-production-ab66.up.railway.app`
+- DATABASE_PUBLIC_URL: `postgresql://postgres:KeJNFQKcKihncBIEllYUwNZUMwtfPpKC@gondola.proxy.rlwy.net:27793/railway`
+- DATABASE_URL (internal): `postgresql://postgres:KeJNFQKcKihncBIEllYUwNZUMwtfPpKC@postgres.railway.internal:5432/railway`
+
+### GraphQL API для змінних:
+```js
+// node --input-type=module
+const TOKEN = '6f04a384-b4bd-4c8a-be9b-3d8286850c8d'
+await fetch('https://backboard.railway.app/graphql/v2', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ query, variables })
+})
+```
+
 ## Переменные окружения (Railway)
-- DATABASE_URL — PostgreSQL connection string (Railway автогенерирует)
-- JWT_SECRET — случайная строка
-- BOT_TOKEN — тот же @lambertain_bot (для bot-notify.js)
-- TG_BOOKING_CHAT_ID — -5132805901
-- TG_APKA_CHAT_ID — -1002425111120
-- SYNC_SECRET — секрет для /api/sync/shoot
-- PORT — Railway автогенерирует
+- DATABASE_URL — internal PostgreSQL URL (встановлено)
+- JWT_SECRET — встановлено
+- SYNC_SECRET — секрет для /api/sync/shoot (встановлено)
+- BOT_TOKEN — @lambertain_bot (встановлено)
+- TG_BOOKING_CHAT_ID — -5132805901 (встановлено)
+- TG_APKA_CHAT_ID — -1002425111120 (встановлено)
+- PORT — 3001 (встановлено)
 
 ## API sync (Windows Server → Railway)
 Когда бот апрувит съёмку:

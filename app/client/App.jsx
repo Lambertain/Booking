@@ -138,6 +138,9 @@ export default function App() {
     tabs.push({ key: 'clients',  icon: Icons.orders,   label: t('nav.clients') });
     tabs.push({ key: 'chats',    icon: Icons.chats,    label: t('nav.chats') });
     tabs.push({ key: 'settings', icon: Icons.settings, label: t('nav.settings') });
+  } else if (effectiveRole === 'user') {
+    tabs.push({ key: 'chats',    icon: Icons.chats,    label: t('nav.chats') });
+    tabs.push({ key: 'settings', icon: Icons.settings, label: t('nav.settings') });
   }
 
   const validTab = tabs.find(tb => tb.key === tab) ? tab : tabs[0]?.key;

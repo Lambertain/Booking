@@ -15,6 +15,7 @@ const IMPERSONATE_ROLES = [
   { role: 'manager', label: 'Manager' },
   { role: 'model',   label: 'Model' },
   { role: 'client',  label: 'Client' },
+  { role: 'user',    label: 'User' },
 ];
 
 export default function SettingsScreen({ user, onLogout, onImpersonate, impersonatedRole }) {
@@ -156,6 +157,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
           <div className="input-group">
             <div className="input-label">Role</div>
             <select value={newUser.role} onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))}>
+              <option value="user">User</option>
               <option value="manager">Manager</option>
               <option value="model">Model</option>
               <option value="client">Client</option>
