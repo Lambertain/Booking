@@ -23,6 +23,7 @@ app.use('/api/media',         require('./routes/media'));
 app.use('/api/orders',        require('./routes/orders'));
 app.use('/api/templates',     require('./routes/templates'));
 app.use('/api/bot',           require('./routes/bot').router);
+app.use('/api/broadcast',     require('./routes/broadcast'));
 
 // Serve React build in production
 const distDir = path.join(__dirname, '../dist');

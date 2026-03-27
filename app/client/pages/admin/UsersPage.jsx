@@ -75,7 +75,10 @@ export default function UsersPage() {
                 <td>{u.name}</td>
                 <td><span className="badge" style={{ background: 'var(--bg3)' }}>{u.role}</span></td>
                 <td style={{ color: 'var(--text2)' }}>{u.email || '—'}</td>
-                <td style={{ color: 'var(--text2)' }}>{u.telegram_username ? `@${u.telegram_username}` : '—'}</td>
+                <td style={{ color: 'var(--text2)' }}>
+                  {u.telegram_username ? `@${u.telegram_username}` : '—'}
+                  {u.sub_status === 'blocked' && <span title="Заблокував бота" style={{ marginLeft: 4 }}>🚫</span>}
+                </td>
                 <td>
                   <span className={`badge ${u.is_active ? 'badge-confirmed' : 'badge-cancelled'}`}>
                     {u.is_active ? 'Активний' : 'Заблокований'}

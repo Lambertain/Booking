@@ -5,11 +5,112 @@ import Avatar from '../components/Avatar.jsx';
 import TopBar from '../components/TopBar.jsx';
 import Sheet from '../components/Sheet.jsx';
 
+function BroadcastSheet({ open, onClose }) {
+  const [tags, setTags] = useState([]);
+  const [allTotal, setAllTotal] = useState(0);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [count, setCount] = useState(0);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setResult(null);
+    api.get('/api/broadcast/tags').then(d => {
+      setTags(d.tags || []);
+      setAllTotal(d.total || 0);
+      setCount(d.total || 0);
+    });
+  }, [open]);
+
+  async function updateCount(newTags) {
+    const q = newTags.length ? `?tags=${newTags.map(encodeURIComponent).join(',')}` : '';
+    const d = await api.get(`/api/broadcast/subscribers${q}`);
+    setCount(d.count);
+  }
+
+  function toggleTag(tag) {
+    setSelectedTags(prev => {
+      const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag];
+      updateCount(next);
+      return next;
+    });
+  }
+
+  async function send() {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    try {
+      const d = await api.post('/api/broadcast', { text: text.trim(), tags: selectedTags });
+      setResult(`✅ Відправляється ${d.count} повідомлень`);
+      setText('');
+    } catch (err) {
+      setResult(`❌ ${err.message}`);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="📣 Розсилка">
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
+          Теги (не обрано = всі активні):
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {tags.map(({ tag, count: tc }) => (
+            <button
+              key={tag}
+              onClick={() => toggleTag(tag)}
+              style={{
+                padding: '4px 10px', borderRadius: 12, fontSize: 12, cursor: 'pointer', border: '1px solid var(--border)',
+                background: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--bg3)',
+                color: selectedTags.includes(tag) ? '#fff' : 'var(--text1)',
+              }}
+            >
+              {tag} ({tc})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
+        Отримувачів: <b style={{ color: 'var(--text1)' }}>{count}</b> з {allTotal} активних
+      </div>
+
+      <div className="input-group">
+        <div className="input-label">Повідомлення</div>
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={5}
+          placeholder="Текст повідомлення..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+
+      {result && (
+        <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg3)', fontSize: 13, marginBottom: 8 }}>
+          {result}
+        </div>
+      )}
+
+      <button className="btn btn-primary btn-full" onClick={send} disabled={!text.trim() || sending}>
+        {sending ? 'Відправка...' : `📣 Надіслати ${count} отримувачам`}
+      </button>
+    </Sheet>
+  );
+}
+
 export default function ChatsScreen({ user }) {
   const { t } = useLang();
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+
+  const canBroadcast = user.role === 'admin' || user.role === 'manager';
 
   useEffect(() => {
     api.get('/api/conversations').then(setConvs).finally(() => setLoading(false));
@@ -31,12 +132,27 @@ export default function ChatsScreen({ user }) {
     return c.participant_a_name;
   }
 
+  function convBotBlocked(c) {
+    const aIsClient = !['admin','manager'].includes(c.participant_a_role);
+    const subStatus = aIsClient ? c.participant_a_sub_status : c.participant_b_sub_status;
+    return subStatus === 'blocked';
+  }
+
   if (loading) return <div className="loader"><div className="spinner" /></div>;
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 16px 8px' }}>
+      <div style={{ padding: '16px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('nav.chats')}</h1>
+        {canBroadcast && (
+          <button
+            onClick={() => setBroadcastOpen(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22 }}
+            title="Розсилка"
+          >
+            📣
+          </button>
+        )}
       </div>
       <div className="card" style={{ margin: '0 16px' }}>
         {convs.length === 0 ? (
@@ -47,11 +163,15 @@ export default function ChatsScreen({ user }) {
         ) : convs.map(c => {
           const name = convName(c);
           const unread = parseInt(c.unread) || 0;
+          const blocked = convBotBlocked(c);
           return (
             <div key={c.id} className="list-item" onClick={() => setActive(c)}>
               <Avatar name={name} size={44} />
               <div className="list-item-body">
-                <div className="list-item-title">{name}</div>
+                <div className="list-item-title">
+                  {name}
+                  {blocked && <span title="Заблокував бота" style={{ marginLeft: 6, fontSize: 14 }}>🚫</span>}
+                </div>
                 <div className="list-item-subtitle">{c.last_message || t('conversations.noMessages')}</div>
               </div>
               <div className="list-item-right" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
@@ -70,6 +190,8 @@ export default function ChatsScreen({ user }) {
           );
         })}
       </div>
+
+      <BroadcastSheet open={broadcastOpen} onClose={() => setBroadcastOpen(false)} />
     </div>
   );
 }

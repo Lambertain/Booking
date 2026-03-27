@@ -43,12 +43,18 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         );
       } else if (roleFilter) {
         rows = await all(
-          `SELECT id, role, name, email, telegram_username, is_active, created_at FROM users WHERE role = $1 ORDER BY created_at`,
+          `SELECT u.id, u.role, u.name, u.email, u.telegram_id, u.telegram_username, u.is_active, u.created_at,
+                  s.status as sub_status
+           FROM users u LEFT JOIN subscribers s ON s.telegram_id = u.telegram_id
+           WHERE u.role = $1 ORDER BY u.created_at`,
           [roleFilter]
         );
       } else {
         rows = await all(
-          `SELECT id, role, name, email, telegram_username, is_active, created_at FROM users ORDER BY created_at`,
+          `SELECT u.id, u.role, u.name, u.email, u.telegram_id, u.telegram_username, u.is_active, u.created_at,
+                  s.status as sub_status
+           FROM users u LEFT JOIN subscribers s ON s.telegram_id = u.telegram_id
+           ORDER BY u.created_at`,
           []
         );
       }

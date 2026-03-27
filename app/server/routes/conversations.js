@@ -9,9 +9,13 @@ router.get('/', requireAuth(), async (req, res) => {
   try {
     const { id, role } = req.user;
     let rows;
+    const subJoin = `
+      LEFT JOIN subscribers sa ON sa.telegram_id = ua.telegram_id
+      LEFT JOIN subscribers sb ON sb.telegram_id = ub.telegram_id`;
+    const subSelect = `sa.status as participant_a_sub_status, sb.status as participant_b_sub_status,`;
     if (role === 'admin' || role === 'manager') {
       rows = await all(
-        `SELECT c.*,
+        `SELECT c.*, ${subSelect}
            ua.name as participant_a_name, ua.role as participant_a_role,
            ub.name as participant_b_name, ub.role as participant_b_role,
            (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
@@ -19,12 +23,13 @@ router.get('/', requireAuth(), async (req, res) => {
          FROM conversations c
          JOIN users ua ON ua.id = c.participant_a
          JOIN users ub ON ub.id = c.participant_b
+         ${subJoin}
          ORDER BY c.last_message_at DESC NULLS LAST`,
         [id]
       );
     } else {
       rows = await all(
-        `SELECT c.*,
+        `SELECT c.*, ${subSelect}
            ua.name as participant_a_name, ua.role as participant_a_role,
            ub.name as participant_b_name, ub.role as participant_b_role,
            (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
@@ -32,6 +37,7 @@ router.get('/', requireAuth(), async (req, res) => {
          FROM conversations c
          JOIN users ua ON ua.id = c.participant_a
          JOIN users ub ON ub.id = c.participant_b
+         ${subJoin}
          WHERE c.participant_a = $1 OR c.participant_b = $1
          ORDER BY c.last_message_at DESC NULLS LAST`,
         [id]
