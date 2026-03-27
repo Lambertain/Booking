@@ -3,6 +3,7 @@ const https = require('https');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const BOOKING_CHAT_ID = process.env.TG_BOOKING_CHAT_ID;
 const APKA_CHAT_ID = process.env.TG_APKA_CHAT_ID;
+const XAI_API_KEY = process.env.XAI_API_KEY;
 
 function tgPost(method, body) {
   return new Promise((resolve, reject) => {
@@ -38,6 +39,54 @@ async function forwardToTelegram(recipientId, senderName, text) {
   } catch {}
 }
 
+// Generate AI draft reply using Grok
+async function generateAiDraft(convId, senderName) {
+  if (!XAI_API_KEY) return null;
+  try {
+    const { all } = require('./db');
+    const history = await all(
+      `SELECT m.text, u.role, u.name
+       FROM messages m JOIN users u ON u.id = m.sender_id
+       WHERE m.conversation_id = $1
+       ORDER BY m.created_at DESC LIMIT 10`,
+      [convId]
+    );
+
+    const historyText = history.reverse().map(m => {
+      const who = (m.role === 'admin' || m.role === 'manager') ? 'Менеджер' : m.name;
+      return `${who}: ${m.text}`;
+    }).join('\n');
+
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${XAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'grok-3-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Ти менеджер букінг агентства фотомоделей Lambertain. Відповідай коротко, по суті, на мові клієнта (українська, російська або англійська). Без зайвих формальностей.',
+          },
+          {
+            role: 'user',
+            content: `Контекст діалогу:\n${historyText}\n\nНапиши відповідь менеджера на останнє повідомлення клієнта.`,
+          },
+        ],
+        max_tokens: 400,
+      }),
+    });
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (err) {
+    console.error('[AI draft]', err.message);
+    return null;
+  }
+}
+
 // New message from client/model in mini app → send to appropriate Telegram chat
 async function notifyNewMessage(conv, msg, sender) {
   if (!BOT_TOKEN) return;
@@ -53,12 +102,34 @@ async function notifyNewMessage(conv, msg, sender) {
       disable_notification: false,
     });
   } else if (conv.type === 'client_support') {
-    // Client wrote → send to АПКА for AI approval
+    // Client wrote → send to АПКА
     if (!APKA_CHAT_ID) return;
-    const text = `💬 <b>Клієнт ${sender.name}</b> написав:\n${msg.text}\n\n<i>conv_id: ${conv.id} | msg_id: ${msg.id}</i>`;
-    const result = await tgPost('sendMessage', {
+
+    const { query } = require('./db');
+
+    // 1. Send user message notification
+    const notifText = `💬 <b>${sender.name}</b> написав:\n${msg.text}\n\n<i>conv_id: ${conv.id} | msg_id: ${msg.id}</i>`;
+    const notifResult = await tgPost('sendMessage', {
       chat_id: APKA_CHAT_ID,
-      text,
+      text: notifText,
+      parse_mode: 'HTML',
+    });
+    if (notifResult.ok) {
+      await query('UPDATE messages SET tg_message_id = $1 WHERE id = $2',
+        [notifResult.result.message_id, msg.id]);
+    }
+
+    // 2. Generate AI draft
+    const draft = await generateAiDraft(conv.id, sender.name);
+    if (!draft) return;
+
+    // Save draft to DB
+    await query('UPDATE messages SET ai_draft = $1 WHERE id = $2', [draft, msg.id]);
+
+    // 3. Send draft with approve buttons
+    await tgPost('sendMessage', {
+      chat_id: APKA_CHAT_ID,
+      text: `🤖 <b>Чернетка відповіді:</b>\n${draft}`,
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [[
@@ -68,23 +139,16 @@ async function notifyNewMessage(conv, msg, sender) {
         ]],
       },
     });
-    // Store tg_message_id for later reference
-    if (result.ok) {
-      const { query } = require('./db');
-      await query('UPDATE messages SET tg_message_id = $1 WHERE id = $2',
-        [result.result.message_id, msg.id]);
-    }
   }
 }
 
-// Send approved reply back to conversation (called from booking bot after approve)
+// Send approved reply back to conversation (called from bot webhook after approve)
 async function deliverApprovedReply(convId, text, approverId) {
   const { one, query } = require('./db');
 
   const conv = await one('SELECT * FROM conversations WHERE id = $1', [convId]);
   if (!conv) throw new Error(`Conv ${convId} not found`);
 
-  // Find admin/manager to be the sender
   const sender = await one('SELECT id FROM users WHERE id = $1', [approverId]);
   const senderId = sender?.id || approverId;
 
@@ -103,4 +167,4 @@ async function deliverApprovedReply(convId, text, approverId) {
   return msg;
 }
 
-module.exports = { notifyNewMessage, deliverApprovedReply };
+module.exports = { notifyNewMessage, deliverApprovedReply, forwardToTelegram };
