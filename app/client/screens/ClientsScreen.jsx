@@ -65,6 +65,18 @@ export default function ClientsScreen({ user }) {
 
   const [pickerSubs, setPickerSubs] = useState([]);
 
+  async function patchOrderStatus(id, status, e) {
+    e.stopPropagation();
+    const updated = await api.patch(`/api/orders/${id}`, { status });
+    setOrders(os => os.map(x => x.id === id ? { ...x, status: updated.status } : x));
+  }
+
+  async function patchTemplateStep(id, deal_step, e) {
+    e.stopPropagation();
+    const updated = await api.patch(`/api/templates/${id}`, { deal_step });
+    setTemplates(ts => ts.map(x => x.id === id ? { ...x, deal_step: updated.deal_step } : x));
+  }
+
   useEffect(() => {
     const loads = [
       api.get('/api/orders'),
@@ -216,12 +228,33 @@ export default function ClientsScreen({ user }) {
                     </div>
 
                     {/* Contact / people row */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)', marginBottom: canEdit ? 8 : 0 }}>
                       {o.contact_name && <span>👤 {o.contact_name}</span>}
                       {o.client_name && o.client_name !== o.contact_name && <span>🏢 {o.client_name}</span>}
                       {o.model_sites && <span>🌐 {o.model_sites}</span>}
                       {o.deal_step && <span style={{ color: 'var(--text3)' }}>CRM: {o.deal_step}</span>}
                     </div>
+
+                    {/* Inline status buttons */}
+                    {canEdit && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                        {['new', 'in_progress', 'done', 'cancelled'].map(s => (
+                          <button
+                            key={s}
+                            onClick={e => patchOrderStatus(o.id, s, e)}
+                            style={{
+                              padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 500,
+                              border: `1px solid ${o.status === s ? STATUS_COLORS[s] : 'var(--separator)'}`,
+                              background: o.status === s ? STATUS_COLORS[s] : 'transparent',
+                              color: o.status === s ? '#fff' : 'var(--text3)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {STATUS_LABELS[s]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -290,11 +323,36 @@ export default function ClientsScreen({ user }) {
                         {tpl.rental_end && <span>⏳ до {fmt(tpl.rental_end)}</span>}
                         {tpl.price > 0 && <span>💶 {tpl.price} EUR</span>}
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)', marginBottom: canEdit ? 8 : 0 }}>
                         {tpl.contact_name && <span>👤 {tpl.contact_name}</span>}
                         {tpl.model_sites && <span>🌐 {tpl.model_sites}</span>}
                         {tpl.accesses && <span>🔑 {tpl.accesses.slice(0, 30)}{tpl.accesses.length > 30 ? '…' : ''}</span>}
                       </div>
+
+                      {/* Inline deal_step buttons */}
+                      {canEdit && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                          {['В работе', 'Готово', 'Удалить'].map(s => {
+                            const active = tpl.deal_step === s;
+                            const color = STEP_COLORS[s] || 'var(--accent)';
+                            return (
+                              <button
+                                key={s}
+                                onClick={e => patchTemplateStep(tpl.id, s, e)}
+                                style={{
+                                  padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 500,
+                                  border: `1px solid ${active ? color : 'var(--separator)'}`,
+                                  background: active ? color : 'transparent',
+                                  color: active ? '#fff' : 'var(--text3)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {s === 'В работе' ? 'В роботі' : s === 'Готово' ? 'Виконано' : 'Видалити'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
