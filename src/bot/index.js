@@ -494,6 +494,13 @@ function startUpdateServer() {
 // --- Lifecycle ---
 async function startBot() {
   console.log('Telegram bot starting...');
+
+  // Set persistent Menu Button (web_app) for all private chats
+  const appUrl = process.env.APP_API_URL || 'https://booking-production-ab66.up.railway.app';
+  bot.api.setChatMenuButton({
+    menu_button: { type: 'web_app', text: '📱 Відкрити апку', web_app: { url: appUrl } },
+  }).then(() => console.log('[bot] Menu button set:', appUrl)).catch(e => console.error('[bot] setChatMenuButton failed:', e.message));
+
   startQueueProcessor();
 
   // Clean up tmp media files older than 24h (every hour)
