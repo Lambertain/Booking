@@ -86,21 +86,14 @@ router.get('/me', require('../auth').requireAuth(), async (req, res) => {
   try {
     const { id, role } = req.user;
     let user;
-    if (role === 'model') {
-      user = await one(
-        `SELECT u.id, u.role, u.name, u.telegram_username, u.photo_url,
-                am.display_name, am.city, am.instagram, am.rates,
-                am.sites_json, am.tours_json, am.styles_json, am.slug
-         FROM users u LEFT JOIN agency_models am ON am.user_id = u.id
-         WHERE u.id = $1`,
-        [id]
-      );
-    } else {
-      user = await one(
-        `SELECT id, role, name, email, telegram_username, photo_url FROM users WHERE id = $1`,
-        [id]
-      );
-    }
+    user = await one(
+      `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.photo_url,
+              am.display_name, am.city, am.instagram, am.rates,
+              am.sites_json, am.tours_json, am.styles_json, am.slug
+       FROM users u LEFT JOIN agency_models am ON am.user_id = u.id
+       WHERE u.id = $1`,
+      [id]
+    );
     res.json({ user: user || req.user });
   } catch (err) {
     res.status(500).json({ error: err.message });

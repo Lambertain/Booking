@@ -29,9 +29,9 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
           `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active,
                   am.slug, am.display_name
            FROM users u
-           LEFT JOIN agency_models am ON am.user_id = u.id
+           JOIN agency_models am ON am.user_id = u.id
            JOIN manager_models mm ON mm.model_id = u.id
-           WHERE u.role = 'model' AND mm.manager_id = $1
+           WHERE mm.manager_id = $1
            ORDER BY u.name`,
           [managerFilter]
         );
@@ -41,8 +41,8 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
                   am.slug, am.display_name, am.city, am.instagram, am.rates,
                   am.sites_json, am.tours_json, am.styles_json, am.portfolio_url
            FROM users u
-           LEFT JOIN agency_models am ON am.user_id = u.id
-           WHERE u.role = 'model' AND u.is_active = TRUE AND am.slug IS NOT NULL
+           JOIN agency_models am ON am.user_id = u.id
+           WHERE u.is_active = TRUE AND am.slug IS NOT NULL
            ORDER BY u.created_at`,
           []
         );
@@ -138,8 +138,8 @@ router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (re
     const { role, id: callerId } = req.user;
     const targetId = parseInt(req.params.id);
 
-    // Models can only edit their own profile
-    if (role === 'model' && callerId !== targetId) {
+    // User can only edit their own profile (unless admin/manager)
+    if (role !== 'admin' && role !== 'manager' && callerId !== targetId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
