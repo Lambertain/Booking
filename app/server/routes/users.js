@@ -12,8 +12,13 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
     let rows;
     if (role === 'manager') {
       rows = await all(
-        `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active
-         FROM users u JOIN manager_models mm ON mm.model_id = u.id WHERE mm.manager_id = $1`,
+        `SELECT u.id, u.role, u.name, u.email, u.telegram_username, u.is_active, u.photo_url,
+                am.slug, am.display_name, am.city, am.instagram, am.rates,
+                am.sites_json, am.tours_json, am.styles_json, am.portfolio_url
+         FROM users u
+         JOIN manager_models mm ON mm.model_id = u.id
+         LEFT JOIN agency_models am ON am.user_id = u.id
+         WHERE mm.manager_id = $1`,
         [id]
       );
     } else {
@@ -167,6 +172,16 @@ router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (re
       [targetId]
     );
     res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/users/:id
+router.delete('/:id', requireAuth('admin'), async (req, res) => {
+  try {
+    await query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

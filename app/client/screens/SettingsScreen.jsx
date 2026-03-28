@@ -70,6 +70,12 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
     setUsers(list => list.map(x => x.id === updated.id ? { ...x, is_active: updated.is_active } : x));
   }
 
+  async function deleteUser(u) {
+    if (!confirm(`Удалить ${u.name}?`)) return;
+    await api.delete(`/api/users/${u.id}`);
+    setUsers(list => list.filter(x => x.id !== u.id));
+  }
+
   async function openAssign(manager) {
     setAssignSheet(manager);
     const [allModels, assignedModels] = await Promise.all([
@@ -154,13 +160,22 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                       </button>
                     )}
                     {u.id !== user.id && (
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => toggleBlock(u)}
-                        style={{ fontSize: 11, background: u.is_active ? 'var(--bg4)' : 'var(--green)', color: u.is_active ? 'var(--red)' : '#fff', borderRadius: 8, padding: '4px 8px', border: 'none', cursor: 'pointer' }}
-                      >
-                        {u.is_active ? 'Block' : 'Unblock'}
-                      </button>
+                      <>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => toggleBlock(u)}
+                          style={{ fontSize: 11, background: u.is_active ? 'var(--bg4)' : 'var(--green)', color: u.is_active ? 'var(--red)' : '#fff', borderRadius: 8, padding: '4px 8px', border: 'none', cursor: 'pointer' }}
+                        >
+                          {u.is_active ? 'Block' : 'Unblock'}
+                        </button>
+                        <button
+                          onClick={() => deleteUser(u)}
+                          style={{ fontSize: 16, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: '4px 2px' }}
+                          title="Delete"
+                        >
+                          🗑
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
