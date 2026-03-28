@@ -45,7 +45,7 @@ export default function ModelsScreen({ user }) {
         model={selected}
         shoots={modelShoots}
         onBack={isModel ? null : () => setSelected(null)}
-        canEdit={user.role === 'admin' || user.role === 'manager'}
+        canEdit={user.role === 'admin' || user.role === 'manager' || isModel}
         onShootUpdated={updated => setShoots(s => s.map(x => x.id === updated.id ? updated : x))}
         onModelUpdated={updated => setModels(m => m.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
       />
