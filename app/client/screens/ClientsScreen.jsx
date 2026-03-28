@@ -220,6 +220,7 @@ export default function ClientsScreen({ user }) {
                             background: STATUS_COLORS[o.status] || 'var(--bg3)',
                             color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600,
                             border: 'none', cursor: 'pointer', appearance: 'none', outline: 'none',
+                            width: 'auto', flexShrink: 0,
                           }}
                         >
                           {['new', 'in_progress', 'done', 'cancelled'].map(s => (
@@ -315,6 +316,7 @@ export default function ClientsScreen({ user }) {
                               background: stepColor, color: '#fff', borderRadius: 6,
                               padding: '2px 8px', fontSize: 11, fontWeight: 600,
                               border: 'none', cursor: 'pointer', appearance: 'none', outline: 'none',
+                              width: 'auto', flexShrink: 0,
                             }}
                           >
                             <option value="">—</option>
