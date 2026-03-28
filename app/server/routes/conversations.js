@@ -10,8 +10,8 @@ router.get('/', requireAuth(), async (req, res) => {
     const { id, role } = req.user;
     let rows;
     const subJoin = `
-      LEFT JOIN subscribers sa ON sa.telegram_id = ua.telegram_id
-      LEFT JOIN subscribers sb ON sb.telegram_id = ub.telegram_id`;
+      LEFT JOIN subscribers sa ON sa.telegram_id = ua.telegram_id::text
+      LEFT JOIN subscribers sb ON sb.telegram_id = ub.telegram_id::text`;
     const subSelect = `sa.status as participant_a_sub_status, sb.status as participant_b_sub_status,`;
     if (role === 'admin' || role === 'manager') {
       rows = await all(

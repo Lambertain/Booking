@@ -45,7 +45,7 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         rows = await all(
           `SELECT u.id, u.role, u.name, u.email, u.telegram_id, u.telegram_username, u.is_active, u.created_at,
                   s.status as sub_status
-           FROM users u LEFT JOIN subscribers s ON s.telegram_id = u.telegram_id
+           FROM users u LEFT JOIN subscribers s ON s.telegram_id = u.telegram_id::text
            WHERE u.role = $1 ORDER BY u.created_at`,
           [roleFilter]
         );
@@ -53,7 +53,7 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         rows = await all(
           `SELECT u.id, u.role, u.name, u.email, u.telegram_id, u.telegram_username, u.is_active, u.created_at,
                   s.status as sub_status
-           FROM users u LEFT JOIN subscribers s ON s.telegram_id = u.telegram_id
+           FROM users u LEFT JOIN subscribers s ON s.telegram_id = u.telegram_id::text
            ORDER BY u.created_at`,
           []
         );
