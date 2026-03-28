@@ -146,7 +146,8 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                       {u.name || '—'}
                     </div>
                     <div className="list-item-subtitle">
-                      {u.role}{u.telegram_username ? ` · @${u.telegram_username}` : ''}
+                      #{u.id} · {u.role}{u.telegram_username ? ` · @${u.telegram_username}` : ''}
+                      {u.created_at && ` · ${new Date(u.created_at).toLocaleDateString('uk-UA')}`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
