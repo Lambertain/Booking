@@ -168,8 +168,19 @@ export default function ClientsScreen({ user }) {
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 16px 8px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('clients.title')}</h1>
+      <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>{t('clients.title')}</h1>
+        {canEdit && tab !== 'contacts' && (
+          <button
+            onClick={() => tab === 'mailings' ? setOrderSheet(true) : setTemplateSheet(true)}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: 'var(--accent)', color: '#fff', fontSize: 22, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(10,132,255,0.35)', flexShrink: 0,
+            }}
+          >+</button>
+        )}
       </div>
 
       {/* Main tabs */}
@@ -328,7 +339,7 @@ export default function ClientsScreen({ user }) {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>{tpl.name}</div>
+                        <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>{(tpl.name || '').replace(/^Шаблон\s*/i, '')}</div>
                         {canEdit ? (
                           <select
                             value={tpl.deal_step || ''}
@@ -487,21 +498,6 @@ export default function ClientsScreen({ user }) {
         }}
       />
 
-      {/* FAB */}
-      {canEdit && tab !== 'contacts' && (
-        <button
-          onClick={() => tab === 'mailings' ? setOrderSheet(true) : setTemplateSheet(true)}
-          style={{
-            position: 'fixed', bottom: 'calc(var(--tabbar-h) + 16px)', right: 20,
-            width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: 'var(--accent)', color: '#fff', fontSize: 28, lineHeight: 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(10,132,255,0.4)', zIndex: 50,
-          }}
-        >
-          +
-        </button>
-      )}
 
       {/* Create order sheet */}
       <Sheet open={orderSheet} onClose={() => setOrderSheet(false)} title={t('mailings.newOrder')}>

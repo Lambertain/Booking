@@ -84,7 +84,7 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
   const stepColor = STEP_COLORS[template.deal_step] || 'var(--text3)';
 
   return (
-    <Sheet open={!!template} onClose={handleClose} title={editing ? t('editing') : (template.name || `#${template.id}`)}>
+    <Sheet open={!!template} onClose={handleClose} title={editing ? t('editing') : ((template.name || '').replace(/^Шаблон\s*/i, '') || `#${template.id}`)}>
       {editing && form ? (
         <div>
           <div className="input-group">

@@ -195,6 +195,17 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
               <div style={{ fontSize: 13, color: 'var(--accent)', marginTop: 1 }}>@{profile.instagram}</div>
             )}
           </div>
+          {canEdit && (
+            <button
+              onClick={() => setCreateShoot(true)}
+              style={{
+                width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                background: 'var(--accent)', color: '#fff', fontSize: 22, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(10,132,255,0.35)', flexShrink: 0,
+              }}
+            >+</button>
+          )}
         </div>
 
         {/* Upcoming tours */}
@@ -291,24 +302,6 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
         )}
       </div>
 
-      {/* FAB: add shoot */}
-      {canEdit && (
-        <button
-          onClick={() => setCreateShoot(true)}
-          style={{
-            position: 'fixed',
-            bottom: 'calc(var(--tabbar-h) + 16px)',
-            right: 20,
-            width: 52, height: 52, borderRadius: '50%',
-            border: 'none', cursor: 'pointer',
-            background: 'var(--accent)', color: '#fff',
-            fontSize: 28, lineHeight: 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(10,132,255,0.4)',
-            zIndex: 50,
-          }}
-        >+</button>
-      )}
 
       {/* ── Edit profile sheet ── */}
       <Sheet open={editSheet} onClose={() => setEditSheet(false)} title="Редактировать профиль">
