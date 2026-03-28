@@ -17,12 +17,12 @@ router.get('/', requireAuth('admin', 'manager', 'client'), async (req, res) => {
 // POST /api/templates
 router.post('/', requireAuth('admin', 'manager'), async (req, res) => {
   try {
-    const { name, rental_start, rental_end } = req.body;
+    const { name, rental_start, rental_end, deal_type } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
     const row = await one(
-      `INSERT INTO mailing_templates (name, created_by, rental_start, rental_end)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [name, req.user.id, rental_start || null, rental_end || null]
+      `INSERT INTO mailing_templates (name, created_by, rental_start, rental_end, deal_type)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [name, req.user.id, rental_start || null, rental_end || null, deal_type || 'rent']
     );
     res.status(201).json(row);
   } catch (err) {

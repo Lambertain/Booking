@@ -63,7 +63,10 @@ export default function ClientsScreen({ user }) {
   const [orderForm, setOrderForm] = useState({
     user_id: '', order_type: 'rent', rental_start: '', rental_end: '', price: '', notes: '',
   });
-  const [templateForm, setTemplateForm] = useState({ name: '', rental_start: '', rental_end: '' });
+  const [templateForm, setTemplateForm] = useState({ name: '', rental_start: '', rental_end: '', deal_type: 'rent' });
+  const [templateNameMode, setTemplateNameMode] = useState('select'); // 'select' | 'custom'
+  const [editNamesSheet, setEditNamesSheet] = useState(false);
+  const [editingName, setEditingName] = useState({ old: '', new: '' });
 
   const canEdit = user.role === 'admin' || user.role === 'manager';
 
@@ -145,7 +148,8 @@ export default function ClientsScreen({ user }) {
     const created = await api.post('/api/templates', templateForm);
     setTemplates(tpl => [created, ...tpl]);
     setTemplateSheet(false);
-    setTemplateForm({ name: '', rental_start: '', rental_end: '' });
+    setTemplateNameMode('select');
+    setTemplateForm({ name: '', rental_start: '', rental_end: '', deal_type: 'rent' });
   }
 
   // Derived data
@@ -541,20 +545,77 @@ export default function ClientsScreen({ user }) {
       </Sheet>
 
       {/* Create template sheet */}
-      <Sheet open={templateSheet} onClose={() => setTemplateSheet(false)} title={t('templates.newTemplate')}>
-        <div className="input-group">
-          <div className="input-label">{t('templates.name')}</div>
-          <input value={templateForm.name} onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} placeholder={t('templates.name')} />
-        </div>
-        <div className="input-group">
-          <div className="input-label">{t('mailings.rentalStart')}</div>
-          <input type="date" value={templateForm.rental_start} onChange={e => setTemplateForm(f => ({ ...f, rental_start: e.target.value }))} />
-        </div>
-        <div className="input-group">
-          <div className="input-label">{t('mailings.rentalEnd')}</div>
-          <input type="date" value={templateForm.rental_end} onChange={e => setTemplateForm(f => ({ ...f, rental_end: e.target.value }))} />
-        </div>
-        <button className="btn btn-primary btn-full" onClick={createTemplate}>{t('add')}</button>
+      <Sheet open={templateSheet} onClose={() => { setTemplateSheet(false); setTemplateNameMode('select'); }} title={t('templates.newTemplate')}>
+        {(() => {
+          const existingNames = [...new Set(
+            templates.map(tpl => (tpl.name || '').replace(/^Шаблон\s*/i, '').trim()).filter(Boolean)
+          )].sort();
+          return (
+            <>
+              <div className="input-group">
+                <div className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t('templates.name')}</span>
+                  {templateNameMode === 'select' && existingNames.length > 0 && (
+                    <button
+                      onClick={() => setEditNamesSheet(true)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, cursor: 'pointer', padding: 0 }}
+                    >✏️ Редагувати</button>
+                  )}
+                </div>
+                {templateNameMode === 'select' ? (
+                  <select
+                    value={templateForm.name}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        setTemplateNameMode('custom');
+                        setTemplateForm(f => ({ ...f, name: '' }));
+                      } else {
+                        setTemplateForm(f => ({ ...f, name: e.target.value }));
+                      }
+                    }}
+                  >
+                    <option value="">— {t('templates.name')} —</option>
+                    {existingNames.map(n => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                    <option value="__custom__">+ Нова назва...</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      autoFocus
+                      value={templateForm.name}
+                      onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder={t('templates.name')}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      className="btn btn-secondary"
+                      style={{ flexShrink: 0, fontSize: 12 }}
+                      onClick={() => { setTemplateNameMode('select'); setTemplateForm(f => ({ ...f, name: '' })); }}
+                    >←</button>
+                  </div>
+                )}
+              </div>
+              <div className="input-group">
+                <div className="input-label">{t('mailings.orderType')}</div>
+                <select value={templateForm.deal_type} onChange={e => setTemplateForm(f => ({ ...f, deal_type: e.target.value }))}>
+                  <option value="rent">{t('mailings.orderTypeLabels.rent')}</option>
+                  <option value="sale">{t('mailings.orderTypeLabels.sale')}</option>
+                </select>
+              </div>
+              <div className="input-group">
+                <div className="input-label">{t('mailings.rentalStart')}</div>
+                <input type="date" value={templateForm.rental_start} onChange={e => setTemplateForm(f => ({ ...f, rental_start: e.target.value }))} />
+              </div>
+              <div className="input-group">
+                <div className="input-label">{t('mailings.rentalEnd')}</div>
+                <input type="date" value={templateForm.rental_end} onChange={e => setTemplateForm(f => ({ ...f, rental_end: e.target.value }))} />
+              </div>
+              <button className="btn btn-primary btn-full" onClick={createTemplate} disabled={!templateForm.name}>{t('add')}</button>
+            </>
+          );
+        })()}
       </Sheet>
 
       {/* Order detail/edit sheet */}
@@ -569,6 +630,55 @@ export default function ClientsScreen({ user }) {
           setSelectedOrder(updated);
         }}
       />
+
+      {/* Edit template names sheet */}
+      <Sheet open={editNamesSheet} onClose={() => { setEditNamesSheet(false); setEditingName({ old: '', new: '' }); }} title="Назви шаблонів">
+        {(() => {
+          const existingNames = [...new Set(
+            templates.map(tpl => (tpl.name || '').replace(/^Шаблон\s*/i, '').trim()).filter(Boolean)
+          )].sort();
+          return (
+            <div>
+              <div className="card" style={{ marginBottom: 12 }}>
+                {existingNames.map(n => (
+                  <div key={n} className="list-item">
+                    {editingName.old === n ? (
+                      <div style={{ display: 'flex', gap: 6, flex: 1 }}>
+                        <input
+                          autoFocus
+                          value={editingName.new}
+                          onChange={e => setEditingName(x => ({ ...x, new: e.target.value }))}
+                          style={{ flex: 1 }}
+                        />
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: 12 }} onClick={async () => {
+                          if (!editingName.new.trim() || editingName.new === n) { setEditingName({ old: '', new: '' }); return; }
+                          // Rename all templates with this name
+                          const toRename = templates.filter(t => (t.name || '').replace(/^Шаблон\s*/i, '').trim() === n);
+                          await Promise.all(toRename.map(t => api.patch(`/api/templates/${t.id}`, { name: editingName.new.trim() })));
+                          setTemplates(ts => ts.map(t => {
+                            const tName = (t.name || '').replace(/^Шаблон\s*/i, '').trim();
+                            return tName === n ? { ...t, name: editingName.new.trim() } : t;
+                          }));
+                          setEditingName({ old: '', new: '' });
+                        }}>✓</button>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 12 }} onClick={() => setEditingName({ old: '', new: '' })}>✕</button>
+                      </div>
+                    ) : (
+                      <>
+                        <span style={{ flex: 1, fontSize: 14 }}>{n}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 8 }}>
+                          {templates.filter(t => (t.name || '').replace(/^Шаблон\s*/i, '').trim() === n).length} шт.
+                        </span>
+                        <button onClick={() => setEditingName({ old: n, new: n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 16 }}>✏️</button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+      </Sheet>
 
       {/* Template detail/edit sheet */}
       <TemplateSheet
