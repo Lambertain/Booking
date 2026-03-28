@@ -70,6 +70,11 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
     setUsers(list => list.map(x => x.id === updated.id ? { ...x, is_active: updated.is_active } : x));
   }
 
+  async function changeRole(u, role) {
+    const updated = await api.patch(`/api/users/${u.id}`, { role });
+    setUsers(list => list.map(x => x.id === updated.id ? { ...x, role: updated.role } : x));
+  }
+
   async function deleteUser(u) {
     if (!confirm(`Удалить ${u.name}?`)) return;
     await api.delete(`/api/users/${u.id}`);
@@ -112,7 +117,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
             </button>
           }
         />
-        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--topbar-h) 16px 32px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--topbar-h) 16px 120px' }}>
           {/* Role tabs */}
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' }}>
             {ROLE_TABS.map(r => (
@@ -151,6 +156,15 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <select
+                      value={u.role}
+                      onChange={e => changeRole(u, e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 8, border: '1px solid var(--separator)', background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer' }}
+                    >
+                      {['user','client','model','manager','admin'].map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
                     {u.role === 'manager' && (
                       <button
                         className="btn btn-sm btn-secondary"

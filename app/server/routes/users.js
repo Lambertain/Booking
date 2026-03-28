@@ -111,7 +111,7 @@ router.post('/', requireAuth('admin'), async (req, res) => {
 // PATCH /api/users/:id
 router.patch('/:id', requireAuth('admin'), async (req, res) => {
   try {
-    const { name, email, password, telegram_id, telegram_username, is_active } = req.body;
+    const { name, email, password, telegram_id, telegram_username, is_active, role } = req.body;
     const updates = [];
     const vals = [];
     let i = 1;
@@ -120,10 +120,11 @@ router.patch('/:id', requireAuth('admin'), async (req, res) => {
     if (telegram_id !== undefined)        { updates.push(`telegram_id = $${i++}`);        vals.push(telegram_id); }
     if (telegram_username !== undefined)  { updates.push(`telegram_username = $${i++}`);  vals.push(telegram_username); }
     if (is_active !== undefined)          { updates.push(`is_active = $${i++}`);          vals.push(is_active); }
+    if (role !== undefined)               { updates.push(`role = $${i++}`);               vals.push(role); }
     if (password)                         { updates.push(`password_hash = $${i++}`);      vals.push(await bcrypt.hash(password, 10)); }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     vals.push(req.params.id);
-    const row = await one(`UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, role, name, email, is_active`, vals);
+    const row = await one(`UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, role, name, email, telegram_username, is_active, created_at`, vals);
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
