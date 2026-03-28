@@ -93,18 +93,58 @@ router.post('/', requireAuth('admin', 'manager', 'client'), async (req, res) => 
 // PATCH /api/orders/:id
 router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
   try {
-    const { status, notes, order_type, rental_start, rental_end } = req.body;
+    const {
+      status, notes, order_type, rental_start, rental_end,
+      template_name, contact_name, contact_email, model_sites,
+      responsible, price, deal_step, tour_start_2, tour_end_2,
+      source_type, user_id,
+    } = req.body;
     const updates = [];
     const vals = [];
     let i = 1;
-    if (status !== undefined)       { updates.push(`status = $${i++}`);       vals.push(status); }
-    if (notes !== undefined)        { updates.push(`notes = $${i++}`);        vals.push(notes); }
-    if (order_type !== undefined)   { updates.push(`order_type = $${i++}`);   vals.push(order_type); }
-    if (rental_start !== undefined) { updates.push(`rental_start = $${i++}`); vals.push(rental_start); }
-    if (rental_end !== undefined)   { updates.push(`rental_end = $${i++}`);   vals.push(rental_end); }
+
+    // Link to user → auto-create client record if missing
+    if (user_id !== undefined) {
+      if (user_id === null || user_id === '') {
+        updates.push(`client_id = $${i++}`); vals.push(null);
+      } else {
+        let c = await one('SELECT id FROM clients WHERE user_id = $1', [user_id]);
+        if (!c) {
+          c = await one('INSERT INTO clients (user_id) VALUES ($1) RETURNING id', [user_id]);
+          await query(`UPDATE users SET role = 'client' WHERE id = $1 AND role = 'user'`, [user_id]);
+        }
+        updates.push(`client_id = $${i++}`); vals.push(c.id);
+      }
+    }
+
+    if (template_name !== undefined) { updates.push(`template_name = $${i++}`); vals.push(template_name); }
+    if (status !== undefined)        { updates.push(`status = $${i++}`);        vals.push(status); }
+    if (notes !== undefined)         { updates.push(`notes = $${i++}`);         vals.push(notes); }
+    if (order_type !== undefined)    { updates.push(`order_type = $${i++}`);    vals.push(order_type); }
+    if (rental_start !== undefined)  { updates.push(`rental_start = $${i++}`);  vals.push(rental_start || null); }
+    if (rental_end !== undefined)    { updates.push(`rental_end = $${i++}`);    vals.push(rental_end || null); }
+    if (tour_start_2 !== undefined)  { updates.push(`tour_start_2 = $${i++}`);  vals.push(tour_start_2 || null); }
+    if (tour_end_2 !== undefined)    { updates.push(`tour_end_2 = $${i++}`);    vals.push(tour_end_2 || null); }
+    if (contact_name !== undefined)  { updates.push(`contact_name = $${i++}`);  vals.push(contact_name); }
+    if (contact_email !== undefined) { updates.push(`contact_email = $${i++}`); vals.push(contact_email); }
+    if (model_sites !== undefined)   { updates.push(`model_sites = $${i++}`);   vals.push(model_sites); }
+    if (responsible !== undefined)   { updates.push(`responsible = $${i++}`);   vals.push(responsible); }
+    if (price !== undefined)         { updates.push(`price = $${i++}`);         vals.push(price || null); }
+    if (deal_step !== undefined)     { updates.push(`deal_step = $${i++}`);     vals.push(deal_step); }
+    if (source_type !== undefined)   { updates.push(`source_type = $${i++}`);   vals.push(source_type); }
+
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     vals.push(req.params.id);
-    const row = await one(`UPDATE mailing_orders SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`, vals);
+
+    await query(`UPDATE mailing_orders SET ${updates.join(', ')} WHERE id = $${i}`, vals);
+    // Return with joined client name
+    const row = await one(
+      `SELECT o.*, u.name as client_name FROM mailing_orders o
+       LEFT JOIN clients c ON c.id = o.client_id
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE o.id = $1`,
+      [req.params.id]
+    );
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });

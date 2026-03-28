@@ -1,8 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useLang } from '../i18n/useLang.js';
-import TopBar from '../components/TopBar.jsx';
 import Sheet from '../components/Sheet.jsx';
+import OrderSheet from '../components/OrderSheet.jsx';
+import TemplateSheet from '../components/TemplateSheet.jsx';
+
+const ORDER_STATUSES = ['all', 'new', 'in_progress', 'done', 'cancelled'];
+const STATUS_LABELS = { all: 'Всі', new: 'Новий', in_progress: 'В роботі', done: 'Виконано', cancelled: 'Скасовано' };
+const STATUS_COLORS = {
+  new: 'var(--accent)',
+  in_progress: 'var(--orange)',
+  done: 'var(--green)',
+  cancelled: 'var(--text3)',
+};
+const STEP_COLORS = {
+  'В работе': 'var(--accent)',
+  'Удалить': 'var(--red)',
+  'Готово': 'var(--green)',
+};
+
+function fmt(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 export default function ClientsScreen({ user }) {
   const { t } = useLang();
@@ -10,26 +30,39 @@ export default function ClientsScreen({ user }) {
   const [orders, setOrders] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [clients, setClients] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter state
+  const [orderFilter, setOrderFilter] = useState('all');
+  const [stepFilter, setStepFilter] = useState('all');
+
+  // Sheet state
   const [orderSheet, setOrderSheet] = useState(false);
   const [templateSheet, setTemplateSheet] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+
+  // Create forms
   const [orderForm, setOrderForm] = useState({
-    user_id: '', sites: '', regions: '', volume: '', price: '',
-    notes: '', order_type: 'rent', rental_start: '', rental_end: '',
+    user_id: '', order_type: 'rent', rental_start: '', rental_end: '', price: '', notes: '',
   });
   const [templateForm, setTemplateForm] = useState({ name: '', rental_start: '', rental_end: '' });
 
   const canEdit = user.role === 'admin' || user.role === 'manager';
 
   useEffect(() => {
-    Promise.all([
+    const loads = [
       api.get('/api/orders'),
       api.get('/api/templates'),
       canEdit ? api.get('/api/orders/clients') : Promise.resolve([]),
-    ]).then(([o, tpl, cl]) => {
+      canEdit ? api.get('/api/users') : Promise.resolve([]),
+    ];
+    Promise.all(loads).then(([o, tpl, cl, users]) => {
       setOrders(o);
       setTemplates(tpl);
       setClients(cl);
+      setAllUsers(Array.isArray(users) ? users : []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -38,7 +71,7 @@ export default function ClientsScreen({ user }) {
     const created = await api.post('/api/orders', orderForm);
     setOrders(o => [created, ...o]);
     setOrderSheet(false);
-    setOrderForm({ user_id: '', sites: '', regions: '', volume: '', price: '', notes: '', order_type: 'rent', rental_start: '', rental_end: '' });
+    setOrderForm({ user_id: '', order_type: 'rent', rental_start: '', rental_end: '', price: '', notes: '' });
   }
 
   async function createTemplate() {
@@ -49,15 +82,15 @@ export default function ClientsScreen({ user }) {
     setTemplateForm({ name: '', rental_start: '', rental_end: '' });
   }
 
-  async function changeOrderStatus(order, status) {
-    const updated = await api.patch(`/api/orders/${order.id}`, { status });
-    setOrders(o => o.map(x => x.id === updated.id ? updated : x));
-  }
+  // Derived data
+  const filteredOrders = orderFilter === 'all'
+    ? orders
+    : orders.filter(o => o.status === orderFilter);
 
-  function formatDate(d) {
-    if (!d) return '';
-    return new Date(d).toLocaleDateString();
-  }
+  const templateSteps = ['all', ...new Set(templates.map(t => t.deal_step).filter(Boolean))];
+  const filteredTemplates = stepFilter === 'all'
+    ? templates
+    : templates.filter(t => t.deal_step === stepFilter);
 
   if (loading) return <div className="loader"><div className="spinner" /></div>;
 
@@ -67,138 +100,191 @@ export default function ClientsScreen({ user }) {
         <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('clients.title')}</h1>
       </div>
 
+      {/* Main tabs */}
       <div style={{ padding: '0 16px 8px' }}>
         <div className="segmented">
-          <button
-            className={`segmented-btn ${tab === 'mailings' ? 'active' : ''}`}
-            onClick={() => setTab('mailings')}
-          >
-            📋 {t('clients.tabs.mailings')}
+          <button className={`segmented-btn ${tab === 'mailings' ? 'active' : ''}`} onClick={() => setTab('mailings')}>
+            📋 {t('clients.tabs.mailings')} {orders.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({orders.length})</span>}
           </button>
-          <button
-            className={`segmented-btn ${tab === 'templates' ? 'active' : ''}`}
-            onClick={() => setTab('templates')}
-          >
-            📄 {t('clients.tabs.templates')}
+          <button className={`segmented-btn ${tab === 'templates' ? 'active' : ''}`} onClick={() => setTab('templates')}>
+            📄 {t('clients.tabs.templates')} {templates.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({templates.length})</span>}
           </button>
         </div>
       </div>
 
       {tab === 'mailings' && (
-        <div style={{ padding: '0 16px 80px' }}>
-          {orders.length === 0 ? (
-            <div className="empty">
-              <div className="empty-icon">📋</div>
-              <div className="empty-title">{t('mailings.empty')}</div>
-            </div>
-          ) : (
-            <div className="card">
-              {orders.map(o => (
-                <div key={o.id} className="list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 600, fontSize: 15 }}>
-                      {o.template_name || o.client_name || o.deal_id || t('noData')}
+        <>
+          {/* Status filter chips */}
+          <div style={{ padding: '0 16px 10px', overflowX: 'auto', display: 'flex', gap: 6, scrollbarWidth: 'none' }}>
+            {ORDER_STATUSES.map(s => {
+              const count = s === 'all' ? orders.length : orders.filter(o => o.status === s).length;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setOrderFilter(s)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                    background: orderFilter === s ? (s === 'all' ? 'var(--accent)' : STATUS_COLORS[s]) : 'var(--bg3)',
+                    color: orderFilter === s ? '#fff' : 'var(--text2)',
+                  }}
+                >
+                  {STATUS_LABELS[s]} {count > 0 && <span style={{ opacity: 0.8 }}>({count})</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ padding: '0 16px 80px' }}>
+            {filteredOrders.length === 0 ? (
+              <div className="empty">
+                <div className="empty-icon">📋</div>
+                <div className="empty-title">{t('mailings.empty')}</div>
+              </div>
+            ) : (
+              <div className="card">
+                {filteredOrders.map((o, idx) => (
+                  <div
+                    key={o.id}
+                    onClick={() => setSelectedOrder(o)}
+                    style={{
+                      padding: '12px 16px',
+                      cursor: 'pointer',
+                      borderBottom: idx < filteredOrders.length - 1 ? '1px solid var(--separator)' : 'none',
+                    }}
+                  >
+                    {/* Title row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>
+                        {o.template_name || o.client_name || o.deal_id || '—'}
+                      </div>
+                      <span style={{
+                        background: STATUS_COLORS[o.status] || 'var(--bg3)',
+                        color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                      }}>
+                        {STATUS_LABELS[o.status] || o.status}
+                      </span>
                     </div>
-                    {canEdit ? (
-                      <select
-                        value={o.status}
-                        onChange={e => changeOrderStatus(o, e.target.value)}
-                        style={{ width: 'auto', padding: '3px 8px', fontSize: 12, borderRadius: 8 }}
-                      >
-                        {['new', 'in_progress', 'done', 'cancelled'].map(s => (
-                          <option key={s} value={s}>{t(`mailings.statusLabels.${s}`)}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className={`badge badge-${o.status}`}>{t(`mailings.statusLabels.${o.status}`)}</span>
-                    )}
+
+                    {/* Meta row */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
+                      {o.order_type && <span>{o.order_type === 'rent' ? 'Оренда' : 'Продаж'}</span>}
+                      {o.rental_start && <span>📅 {fmt(o.rental_start)} – {fmt(o.rental_end)}</span>}
+                      {o.tour_start_2 && <span>📅 {fmt(o.tour_start_2)} – {fmt(o.tour_end_2)}</span>}
+                      {o.price > 0 && <span>💶 {o.price} EUR</span>}
+                    </div>
+
+                    {/* Contact / people row */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
+                      {o.contact_name && <span>👤 {o.contact_name}</span>}
+                      {o.client_name && o.client_name !== o.contact_name && <span>🏢 {o.client_name}</span>}
+                      {o.model_sites && <span>🌐 {o.model_sites}</span>}
+                      {o.deal_step && <span style={{ color: 'var(--text3)' }}>CRM: {o.deal_step}</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
-                    {o.deal_step && <span>📌 {o.deal_step}</span>}
-                    {o.order_type && <span>{t(`mailings.orderTypeLabels.${o.order_type}`)}</span>}
-                    {o.rental_start && <span>📅 {formatDate(o.rental_start)} – {formatDate(o.rental_end)}</span>}
-                    {o.tour_start_2 && <span>📅2 {formatDate(o.tour_start_2)} – {formatDate(o.tour_end_2)}</span>}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-                    {o.contact_name && <span>👤 {o.contact_name}</span>}
-                    {o.contact_email && <span>✉️ {o.contact_email}</span>}
-                    {o.client_name && <span>🏢 {o.client_name}</span>}
-                    {o.model_sites && <span>🌐 {o.model_sites}</span>}
-                    {o.responsible && <span>🧑‍💼 {o.responsible.split(' ')[0]}</span>}
-                    {o.price > 0 && <span>💶 {o.price}</span>}
-                  </div>
-                  {o.notes && <div style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>{o.notes}</div>}
-                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>{formatDate(o.created_at)}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {tab === 'templates' && (
-        <div style={{ padding: '0 16px 80px' }}>
-          {templates.length === 0 ? (
-            <div className="empty">
-              <div className="empty-icon">📄</div>
-              <div className="empty-title">{t('templates.empty')}</div>
-            </div>
-          ) : (
-            <div className="card">
-              {templates.map(tpl => (
-                <div key={tpl.id} className="list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <div style={{ fontWeight: 600, fontSize: 15 }}>{tpl.name}</div>
-                    {tpl.deal_step && (
-                      <span style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap' }}>📌 {tpl.deal_step}</span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
-                    {tpl.rental_end && <span>⏳ до {formatDate(tpl.rental_end)}</span>}
-                    {tpl.price > 0 && <span>💶 {tpl.price}</span>}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-                    {tpl.contact_name && <span>👤 {tpl.contact_name}</span>}
-                    {tpl.contact_email && <span>✉️ {tpl.contact_email}</span>}
-                    {tpl.model_sites && <span>🌐 {tpl.model_sites}</span>}
-                    {tpl.accesses && <span>🔑 {tpl.accesses}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <>
+          {/* Step filter chips */}
+          <div style={{ padding: '0 16px 10px', overflowX: 'auto', display: 'flex', gap: 6, scrollbarWidth: 'none' }}>
+            {templateSteps.map(s => {
+              const count = s === 'all' ? templates.length : templates.filter(t => t.deal_step === s).length;
+              const color = s === 'all' ? 'var(--accent)' : (STEP_COLORS[s] || 'var(--accent)');
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStepFilter(s)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                    background: stepFilter === s ? color : 'var(--bg3)',
+                    color: stepFilter === s ? '#fff' : 'var(--text2)',
+                  }}
+                >
+                  {s === 'all' ? 'Всі' : s} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ padding: '0 16px 80px' }}>
+            {filteredTemplates.length === 0 ? (
+              <div className="empty">
+                <div className="empty-icon">📄</div>
+                <div className="empty-title">{t('templates.empty')}</div>
+              </div>
+            ) : (
+              <div className="card">
+                {filteredTemplates.map((tpl, idx) => {
+                  const stepColor = STEP_COLORS[tpl.deal_step] || 'var(--accent)';
+                  return (
+                    <div
+                      key={tpl.id}
+                      onClick={() => setSelectedTemplate(tpl)}
+                      style={{
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        borderBottom: idx < filteredTemplates.length - 1 ? '1px solid var(--separator)' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>{tpl.name}</div>
+                        {tpl.deal_step && (
+                          <span style={{
+                            background: stepColor, color: '#fff',
+                            borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                          }}>
+                            {tpl.deal_step}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
+                        {tpl.rental_end && <span>⏳ до {fmt(tpl.rental_end)}</span>}
+                        {tpl.price > 0 && <span>💶 {tpl.price} EUR</span>}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
+                        {tpl.contact_name && <span>👤 {tpl.contact_name}</span>}
+                        {tpl.model_sites && <span>🌐 {tpl.model_sites}</span>}
+                        {tpl.accesses && <span>🔑 {tpl.accesses.slice(0, 30)}{tpl.accesses.length > 30 ? '…' : ''}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {/* FAB — changes form based on active tab */}
+      {/* FAB */}
       {canEdit && (
         <button
           onClick={() => tab === 'mailings' ? setOrderSheet(true) : setTemplateSheet(true)}
           style={{
-            position: 'fixed',
-            bottom: 'calc(var(--tabbar-h) + 16px)',
-            right: 20,
-            width: 52, height: 52, borderRadius: '50%',
-            border: 'none', cursor: 'pointer',
-            background: 'var(--accent)', color: '#fff',
-            fontSize: 28, lineHeight: 1,
+            position: 'fixed', bottom: 'calc(var(--tabbar-h) + 16px)', right: 20,
+            width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'var(--accent)', color: '#fff', fontSize: 28, lineHeight: 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(10,132,255,0.4)',
-            zIndex: 50,
+            boxShadow: '0 4px 16px rgba(10,132,255,0.4)', zIndex: 50,
           }}
         >
           +
         </button>
       )}
 
-      {/* New order sheet */}
+      {/* Create order sheet */}
       <Sheet open={orderSheet} onClose={() => setOrderSheet(false)} title={t('mailings.newOrder')}>
         <div className="input-group">
           <div className="input-label">{t('mailings.client')}</div>
-          <select
-            value={orderForm.user_id}
-            onChange={e => setOrderForm(f => ({ ...f, user_id: e.target.value }))}
-          >
+          <select value={orderForm.user_id} onChange={e => setOrderForm(f => ({ ...f, user_id: e.target.value }))}>
             <option value="">{t('mailings.selectClient')}</option>
             {clients.map(c => (
               <option key={c.user_id} value={c.user_id}>
@@ -207,78 +293,75 @@ export default function ClientsScreen({ user }) {
             ))}
           </select>
         </div>
-
         <div className="input-group">
           <div className="input-label">{t('mailings.orderType')}</div>
-          <select
-            value={orderForm.order_type}
-            onChange={e => setOrderForm(f => ({ ...f, order_type: e.target.value }))}
-          >
+          <select value={orderForm.order_type} onChange={e => setOrderForm(f => ({ ...f, order_type: e.target.value }))}>
             <option value="rent">{t('mailings.orderTypeLabels.rent')}</option>
             <option value="sale">{t('mailings.orderTypeLabels.sale')}</option>
           </select>
         </div>
-
         {orderForm.order_type === 'rent' && (<>
           <div className="input-group">
             <div className="input-label">{t('mailings.rentalStart')}</div>
-            <input type="date" value={orderForm.rental_start}
-              onChange={e => setOrderForm(f => ({ ...f, rental_start: e.target.value }))} />
+            <input type="date" value={orderForm.rental_start} onChange={e => setOrderForm(f => ({ ...f, rental_start: e.target.value }))} />
           </div>
           <div className="input-group">
             <div className="input-label">{t('mailings.rentalEnd')}</div>
-            <input type="date" value={orderForm.rental_end}
-              onChange={e => setOrderForm(f => ({ ...f, rental_end: e.target.value }))} />
+            <input type="date" value={orderForm.rental_end} onChange={e => setOrderForm(f => ({ ...f, rental_end: e.target.value }))} />
           </div>
         </>)}
-
-        {['sites', 'regions', 'volume', 'price'].map(field => (
-          <div className="input-group" key={field}>
-            <div className="input-label">{t(`mailings.${field}`)}</div>
-            <input
-              value={orderForm[field]}
-              onChange={e => setOrderForm(f => ({ ...f, [field]: e.target.value }))}
-              placeholder={t(`mailings.${field}`)}
-            />
-          </div>
-        ))}
-
+        <div className="input-group">
+          <div className="input-label">{t('mailings.price')}</div>
+          <input type="number" value={orderForm.price} onChange={e => setOrderForm(f => ({ ...f, price: e.target.value }))} />
+        </div>
         <div className="input-group">
           <div className="input-label">{t('mailings.notes')}</div>
-          <textarea
-            value={orderForm.notes}
-            onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))}
-            rows={4}
-            placeholder={t('mailings.notes')}
-            style={{ resize: 'vertical' }}
-          />
+          <textarea rows={3} value={orderForm.notes} onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} />
         </div>
-
         <button className="btn btn-primary btn-full" onClick={createOrder}>{t('add')}</button>
       </Sheet>
 
-      {/* New template sheet */}
+      {/* Create template sheet */}
       <Sheet open={templateSheet} onClose={() => setTemplateSheet(false)} title={t('templates.newTemplate')}>
         <div className="input-group">
           <div className="input-label">{t('templates.name')}</div>
-          <input
-            value={templateForm.name}
-            onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))}
-            placeholder={t('templates.name')}
-          />
+          <input value={templateForm.name} onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} placeholder={t('templates.name')} />
         </div>
         <div className="input-group">
           <div className="input-label">{t('mailings.rentalStart')}</div>
-          <input type="date" value={templateForm.rental_start}
-            onChange={e => setTemplateForm(f => ({ ...f, rental_start: e.target.value }))} />
+          <input type="date" value={templateForm.rental_start} onChange={e => setTemplateForm(f => ({ ...f, rental_start: e.target.value }))} />
         </div>
         <div className="input-group">
           <div className="input-label">{t('mailings.rentalEnd')}</div>
-          <input type="date" value={templateForm.rental_end}
-            onChange={e => setTemplateForm(f => ({ ...f, rental_end: e.target.value }))} />
+          <input type="date" value={templateForm.rental_end} onChange={e => setTemplateForm(f => ({ ...f, rental_end: e.target.value }))} />
         </div>
         <button className="btn btn-primary btn-full" onClick={createTemplate}>{t('add')}</button>
       </Sheet>
+
+      {/* Order detail/edit sheet */}
+      <OrderSheet
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        canEdit={canEdit}
+        allUsers={allUsers}
+        onUpdated={updated => {
+          setOrders(os => os.map(x => x.id === updated.id ? updated : x));
+          setSelectedOrder(updated);
+        }}
+      />
+
+      {/* Template detail/edit sheet */}
+      <TemplateSheet
+        template={selectedTemplate}
+        onClose={() => setSelectedTemplate(null)}
+        canEdit={canEdit}
+        allUsers={allUsers}
+        onUpdated={updated => {
+          setTemplates(ts => ts.map(x => x.id === updated.id ? updated : x));
+          setSelectedTemplate(updated);
+        }}
+      />
     </div>
   );
 }
+
