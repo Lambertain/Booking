@@ -54,12 +54,16 @@ router.get('/', requireAuth('admin', 'manager', 'client'), async (req, res) => {
 });
 
 // POST /api/orders
-router.post('/', requireAuth('admin', 'manager', 'client'), async (req, res) => {
+router.post('/', requireAuth('admin', 'manager', 'client', 'model'), async (req, res) => {
   try {
     const { role, id } = req.user;
-    let clientId;
+    let clientId = null;
+    let modelId = null;
 
-    if (role === 'client') {
+    if (role === 'model') {
+      // Model creates tour card — no client link needed
+      modelId = id;
+    } else if (role === 'client') {
       const c = await one('SELECT id FROM clients WHERE user_id = $1', [id]);
       if (!c) return res.status(400).json({ error: 'Client profile not found' });
       clientId = c.id;
@@ -68,7 +72,6 @@ router.post('/', requireAuth('admin', 'manager', 'client'), async (req, res) => 
       if (req.body.client_id) {
         clientId = req.body.client_id;
       } else if (req.body.user_id) {
-        // auto-create client record if missing
         let c = await one('SELECT id FROM clients WHERE user_id = $1', [req.body.user_id]);
         if (!c) {
           c = await one('INSERT INTO clients (user_id) VALUES ($1) RETURNING id', [req.body.user_id]);
@@ -80,11 +83,12 @@ router.post('/', requireAuth('admin', 'manager', 'client'), async (req, res) => 
       }
     }
 
-    const { sites, regions, volume, price, notes, order_type, rental_start, rental_end } = req.body;
+    const { sites, regions, volume, price, notes, order_type, rental_start, rental_end, template_name, responsible } = req.body;
     const row = await one(
-      `INSERT INTO mailing_orders (client_id, target_sites, target_regions, volume, price, notes, order_type, rental_start, rental_end)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [clientId, sites || null, regions || null, volume || null, price || null,
+      `INSERT INTO mailing_orders (client_id, model_id, template_name, responsible, target_sites, target_regions, volume, price, notes, order_type, rental_start, rental_end)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [clientId, modelId, template_name || null, responsible || null,
+       sites || null, regions || null, volume || null, price || null,
        notes || null, order_type || 'rent', rental_start || null, rental_end || null]
     );
     res.status(201).json(row);

@@ -72,7 +72,7 @@ function parseStyles(raw) {
   return { selected, prices };
 }
 
-export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpdated, onModelUpdated }) {
+export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, onShootUpdated, onModelUpdated }) {
   const { t } = useLang();
   const [tab, setTab] = useState('calendar');
   const [editSheet, setEditSheet] = useState(false);
@@ -129,13 +129,30 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
     setSitesList(prev => [...prev, { id, label: val, active: true, price: '' }]);
     setCustomSite('');
   }
-  function addTour() {
+  async function addTour() {
     if (!newTour.city || !newTour.date_from) return;
-    setTours(t => [...t, { ...newTour }]);
+    const tour = { ...newTour };
+    setTours(t => [...t, tour]);
     setNewTour({ city: '', date_from: '', date_to: '' });
     setTourSheet(false);
+
+    // Create mailing order card for this tour
+    try {
+      const label = `${model.display_name || model.name} — Тур: ${tour.city}${tour.date_from ? `, ${tour.date_from}` : ''}${tour.date_to ? ` – ${tour.date_to}` : ''}`;
+      await api.post('/api/orders', {
+        template_name: label,
+        responsible: model.display_name || model.name,
+        rental_start: tour.date_from || null,
+        rental_end: tour.date_to || null,
+        order_type: 'rent',
+      });
+    } catch (e) {
+      console.error('[tour] Failed to create mailing order:', e.message);
+    }
   }
   function removeTour(i) {
+    if (isOwner) return; // models cannot delete tours
+    if (!confirm('Удалить этот тур?')) return;
     setTours(t => t.filter((_, idx) => idx !== i));
   }
 
@@ -191,7 +208,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, onShootUpd
                   color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4,
                 }}>
                   {tour.city} · {tour.date_from}{tour.date_to ? `–${tour.date_to}` : ''}
-                  {canEdit && (
+                  {canEdit && !isOwner && (
                     <button onClick={() => removeTour(tours.indexOf(tour))} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
                   )}
                 </span>
