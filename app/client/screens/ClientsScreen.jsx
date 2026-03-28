@@ -4,6 +4,7 @@ import { useLang } from '../i18n/useLang.js';
 import Sheet from '../components/Sheet.jsx';
 import OrderSheet from '../components/OrderSheet.jsx';
 import TemplateSheet from '../components/TemplateSheet.jsx';
+import Avatar from '../components/Avatar.jsx';
 
 const ORDER_STATUSES = ['all', 'new', 'in_progress', 'done', 'cancelled'];
 const STATUS_LABELS = { all: 'Всі', new: 'Новий', in_progress: 'В роботі', done: 'Виконано', cancelled: 'Скасовано' };
@@ -32,6 +33,12 @@ export default function ClientsScreen({ user }) {
   const [clients, setClients] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Contacts tab state
+  const [subscribers, setSubscribers] = useState([]);
+  const [subSearch, setSubSearch] = useState('');
+  const [subStatus, setSubStatus] = useState('active');
+  const [subLoading, setSubLoading] = useState(false);
 
   // Filter state
   const [orderFilter, setOrderFilter] = useState('all');
@@ -65,6 +72,14 @@ export default function ClientsScreen({ user }) {
       setAllUsers(Array.isArray(users) ? users : []);
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'contacts' || !canEdit) return;
+    setSubLoading(true);
+    const q = new URLSearchParams({ status: subStatus });
+    if (subSearch.trim()) q.set('search', subSearch.trim());
+    api.get(`/api/broadcast/list?${q}`).then(setSubscribers).finally(() => setSubLoading(false));
+  }, [tab, subSearch, subStatus]);
 
   async function createOrder() {
     if (!orderForm.user_id) return;
@@ -104,11 +119,16 @@ export default function ClientsScreen({ user }) {
       <div style={{ padding: '0 16px 8px' }}>
         <div className="segmented">
           <button className={`segmented-btn ${tab === 'mailings' ? 'active' : ''}`} onClick={() => setTab('mailings')}>
-            📋 {t('clients.tabs.mailings')} {orders.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({orders.length})</span>}
+            📋 Розсилки {orders.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({orders.length})</span>}
           </button>
           <button className={`segmented-btn ${tab === 'templates' ? 'active' : ''}`} onClick={() => setTab('templates')}>
-            📄 {t('clients.tabs.templates')} {templates.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({templates.length})</span>}
+            📄 Шаблони {templates.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({templates.length})</span>}
           </button>
+          {canEdit && (
+            <button className={`segmented-btn ${tab === 'contacts' ? 'active' : ''}`} onClick={() => setTab('contacts')}>
+              👥 Контакти
+            </button>
+          )}
         </div>
       </div>
 
@@ -262,6 +282,87 @@ export default function ClientsScreen({ user }) {
             )}
           </div>
         </>
+      )}
+
+      {tab === 'contacts' && canEdit && (
+        <div style={{ padding: '0 16px 80px' }}>
+          {/* Search + status filter */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input
+              value={subSearch}
+              onChange={e => setSubSearch(e.target.value)}
+              placeholder="Пошук по імені / @username..."
+              style={{ flex: 1 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {['active', 'blocked', ''].map(s => (
+              <button
+                key={s}
+                onClick={() => setSubStatus(s)}
+                style={{
+                  padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                  border: 'none', cursor: 'pointer',
+                  background: subStatus === s ? 'var(--accent)' : 'var(--bg3)',
+                  color: subStatus === s ? '#fff' : 'var(--text2)',
+                }}
+              >
+                {s === 'active' ? '✅ Активні' : s === 'blocked' ? '🚫 Заблоковані' : '🔍 Всі'}
+              </button>
+            ))}
+          </div>
+
+          {subLoading ? (
+            <div className="loader"><div className="spinner" /></div>
+          ) : subscribers.length === 0 ? (
+            <div className="empty">
+              <div className="empty-icon">👥</div>
+              <div className="empty-title">Контактів не знайдено</div>
+            </div>
+          ) : (
+            <div className="card">
+              {subscribers.map((sub, idx) => (
+                <div
+                  key={sub.id}
+                  style={{
+                    padding: '10px 16px',
+                    borderBottom: idx < subscribers.length - 1 ? '1px solid var(--separator)' : 'none',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                  }}
+                >
+                  <Avatar name={sub.full_name || sub.username || '?'} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                      {sub.full_name || '—'}
+                      {sub.status === 'blocked' && <span style={{ marginLeft: 6, fontSize: 12 }}>🚫</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+                      {sub.username ? `@${sub.username}` : `tg: ${sub.telegram_id}`}
+                    </div>
+                    {sub.tags?.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        {sub.tags.map(tag => (
+                          <span key={tag} style={{
+                            background: 'var(--accent-bg)', color: 'var(--accent)',
+                            borderRadius: 6, padding: '1px 6px', fontSize: 11,
+                          }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right' }}>
+                    {sub.last_activity_at ? fmt(sub.last_activity_at) : fmt(sub.subscribed_at)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
+            {subscribers.length} контактів (макс. 200)
+          </div>
+        </div>
       )}
 
       {/* FAB */}

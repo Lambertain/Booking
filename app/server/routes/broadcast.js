@@ -25,6 +25,32 @@ function tgPost(method, body) {
   });
 }
 
+// GET /api/broadcast/list — full subscriber list with search/filter
+router.get('/list', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const { search, tag, status } = req.query;
+    const conditions = ['telegram_id::bigint > 0'];
+    const vals = [];
+    let i = 1;
+    if (status) { conditions.push(`status = $${i++}`); vals.push(status); }
+    if (tag)    { conditions.push(`tags @> $${i++}`);  vals.push([tag]); }
+    if (search) {
+      conditions.push(`(full_name ILIKE $${i} OR username ILIKE $${i})`);
+      vals.push(`%${search}%`); i++;
+    }
+    const rows = await all(
+      `SELECT id, telegram_id, username, full_name, status, tags, subscribed_at, last_activity_at
+       FROM subscribers WHERE ${conditions.join(' AND ')}
+       ORDER BY last_activity_at DESC NULLS LAST, subscribed_at DESC
+       LIMIT 200`,
+      vals
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/broadcast/tags — all unique tags with subscriber counts
 router.get('/tags', requireAuth('admin', 'manager'), async (req, res) => {
   try {
