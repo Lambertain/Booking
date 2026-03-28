@@ -9,18 +9,22 @@ import TagManagerSheet from '../components/TagManagerSheet.jsx';
 import Avatar from '../components/Avatar.jsx';
 
 const ORDER_STATUSES = ['all', 'new', 'in_progress', 'done', 'cancelled'];
-const STATUS_LABELS = { all: 'Всі', new: 'Новий', in_progress: 'В роботі', done: 'Виконано', cancelled: 'Скасовано' };
+
 const STATUS_COLORS = {
   new: 'var(--accent)',
   in_progress: 'var(--orange)',
   done: 'var(--green)',
   cancelled: 'var(--text3)',
 };
+
 const STEP_COLORS = {
   'В работе': 'var(--accent)',
   'Удалить': 'var(--red)',
   'Готово': 'var(--green)',
 };
+
+// Maps DB value (Russian) → locale key under templates.stepLabels
+const STEP_LABEL_KEY = { 'В работе': 'inWork', 'Готово': 'done', 'Удалить': 'delete' };
 
 function fmt(d) {
   if (!d) return '';
@@ -64,6 +68,21 @@ export default function ClientsScreen({ user }) {
   const canEdit = user.role === 'admin' || user.role === 'manager';
 
   const [pickerSubs, setPickerSubs] = useState([]);
+
+  // Localized status labels (computed from locale)
+  const STATUS_LABELS = {
+    all: t('mailings.statusLabels.all'),
+    new: t('mailings.statusLabels.new'),
+    in_progress: t('mailings.statusLabels.in_progress'),
+    done: t('mailings.statusLabels.done'),
+    cancelled: t('mailings.statusLabels.cancelled'),
+  };
+
+  function getStepLabel(s) {
+    if (s === 'all') return t('templates.stepLabels.all');
+    const key = STEP_LABEL_KEY[s];
+    return key ? t('templates.stepLabels.' + key) : s;
+  }
 
   async function patchOrderStatus(id, status, e) {
     e.stopPropagation();
@@ -134,12 +153,18 @@ export default function ClientsScreen({ user }) {
     ? orders
     : orders.filter(o => o.status === orderFilter);
 
-  const templateSteps = ['all', ...new Set(templates.map(t => t.deal_step).filter(Boolean))];
+  const templateSteps = ['all', ...new Set(templates.map(tpl => tpl.deal_step).filter(Boolean))];
   const filteredTemplates = stepFilter === 'all'
     ? templates
-    : templates.filter(t => t.deal_step === stepFilter);
+    : templates.filter(tpl => tpl.deal_step === stepFilter);
 
   if (loading) return <div className="loader"><div className="spinner" /></div>;
+
+  const contactFilters = [
+    ['active', t('clients.contacts.active')],
+    ['blocked', t('clients.contacts.blocked')],
+    ['', t('clients.contacts.all')],
+  ];
 
   return (
     <div className="screen">
@@ -151,14 +176,14 @@ export default function ClientsScreen({ user }) {
       <div style={{ padding: '0 16px 8px' }}>
         <div className="segmented">
           <button className={`segmented-btn ${tab === 'mailings' ? 'active' : ''}`} onClick={() => setTab('mailings')}>
-            📋 Розсилки {orders.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({orders.length})</span>}
+            {t('clients.tabs.mailings')} {orders.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({orders.length})</span>}
           </button>
           <button className={`segmented-btn ${tab === 'templates' ? 'active' : ''}`} onClick={() => setTab('templates')}>
-            📄 Шаблони {templates.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({templates.length})</span>}
+            {t('clients.tabs.templates')} {templates.length > 0 && <span style={{ opacity: 0.6, fontSize: 11 }}>({templates.length})</span>}
           </button>
           {canEdit && (
             <button className={`segmented-btn ${tab === 'contacts' ? 'active' : ''}`} onClick={() => setTab('contacts')}>
-              👥 Контакти
+              {t('clients.tabs.contacts')}
             </button>
           )}
         </div>
@@ -206,7 +231,6 @@ export default function ClientsScreen({ user }) {
                       borderBottom: idx < filteredOrders.length - 1 ? '1px solid var(--separator)' : 'none',
                     }}
                   >
-                    {/* Title row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                       <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>
                         {o.template_name || o.client_name || o.deal_id || '—'}
@@ -237,20 +261,18 @@ export default function ClientsScreen({ user }) {
                       )}
                     </div>
 
-                    {/* Meta row */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
-                      {o.order_type && <span>{o.order_type === 'rent' ? 'Оренда' : 'Продаж'}</span>}
+                      {o.order_type && <span>{t('mailings.orderTypeLabels.' + o.order_type)}</span>}
                       {o.rental_start && <span>📅 {fmt(o.rental_start)} – {fmt(o.rental_end)}</span>}
                       {o.tour_start_2 && <span>📅 {fmt(o.tour_start_2)} – {fmt(o.tour_end_2)}</span>}
                       {o.price > 0 && <span>💶 {o.price} EUR</span>}
                     </div>
 
-                    {/* Contact / people row */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
                       {o.contact_name && <span>👤 {o.contact_name}</span>}
                       {o.client_name && o.client_name !== o.contact_name && <span>🏢 {o.client_name}</span>}
                       {o.model_sites && <span>🌐 {o.model_sites}</span>}
-                      {o.deal_step && <span style={{ color: 'var(--text3)' }}>CRM: {o.deal_step}</span>}
+                      {o.deal_step && <span style={{ color: 'var(--text3)' }}>{t('mailings.dealStep')}: {o.deal_step}</span>}
                     </div>
                   </div>
                 ))}
@@ -265,7 +287,7 @@ export default function ClientsScreen({ user }) {
           {/* Step filter chips */}
           <div style={{ padding: '0 16px 10px', overflowX: 'auto', display: 'flex', gap: 6, scrollbarWidth: 'none' }}>
             {templateSteps.map(s => {
-              const count = s === 'all' ? templates.length : templates.filter(t => t.deal_step === s).length;
+              const count = s === 'all' ? templates.length : templates.filter(tpl => tpl.deal_step === s).length;
               const color = s === 'all' ? 'var(--accent)' : (STEP_COLORS[s] || 'var(--accent)');
               return (
                 <button
@@ -279,7 +301,7 @@ export default function ClientsScreen({ user }) {
                     color: stepFilter === s ? '#fff' : 'var(--text2)',
                   }}
                 >
-                  {s === 'all' ? 'Всі' : s} ({count})
+                  {getStepLabel(s)} ({count})
                 </button>
               );
             })}
@@ -321,9 +343,7 @@ export default function ClientsScreen({ user }) {
                           >
                             <option value="">—</option>
                             {['В работе', 'Готово', 'Удалить'].map(s => (
-                              <option key={s} value={s}>
-                                {s === 'В работе' ? 'В роботі' : s === 'Готово' ? 'Виконано' : 'Видалити'}
-                              </option>
+                              <option key={s} value={s}>{getStepLabel(s)}</option>
                             ))}
                           </select>
                         ) : tpl.deal_step && (
@@ -331,12 +351,12 @@ export default function ClientsScreen({ user }) {
                             background: stepColor, color: '#fff',
                             borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                           }}>
-                            {tpl.deal_step}
+                            {getStepLabel(tpl.deal_step)}
                           </span>
                         )}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
-                        {tpl.rental_end && <span>⏳ до {fmt(tpl.rental_end)}</span>}
+                        {tpl.rental_end && <span>⏳ {t('to')} {fmt(tpl.rental_end)}</span>}
                         {tpl.price > 0 && <span>💶 {tpl.price} EUR</span>}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
@@ -355,27 +375,24 @@ export default function ClientsScreen({ user }) {
 
       {tab === 'contacts' && canEdit && (
         <div style={{ padding: '0 16px 80px' }}>
-          {/* Search bar + tag manager button */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input
               value={subSearch}
               onChange={e => setSubSearch(e.target.value)}
-              placeholder="Пошук по імені / @username..."
+              placeholder={t('clients.contacts.searchPlaceholder')}
               style={{ flex: 1 }}
             />
             <button
               className="btn btn-secondary"
               onClick={() => setTagManagerOpen(true)}
-              title="Управління тегами"
               style={{ whiteSpace: 'nowrap' }}
             >
-              🏷️ Теги
+              {t('clients.contacts.tags')}
             </button>
           </div>
 
-          {/* Status filter chips */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            {[['active', '✅ Активні'], ['blocked', '🚫 Заблоковані'], ['', '🔍 Всі']].map(([s, label]) => (
+            {contactFilters.map(([s, label]) => (
               <button
                 key={s}
                 onClick={() => setSubStatus(s)}
@@ -396,7 +413,7 @@ export default function ClientsScreen({ user }) {
           ) : subscribers.length === 0 ? (
             <div className="empty">
               <div className="empty-icon">👥</div>
-              <div className="empty-title">Контактів не знайдено</div>
+              <div className="empty-title">{t('clients.contacts.empty')}</div>
             </div>
           ) : (
             <div className="card">
@@ -443,7 +460,7 @@ export default function ClientsScreen({ user }) {
             </div>
           )}
           <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
-            {subscribers.length} контактів
+            {subscribers.length} {t('clients.contacts.count')}
           </div>
         </div>
       )}
@@ -452,7 +469,7 @@ export default function ClientsScreen({ user }) {
       <SubscriberSheet
         subscriber={selectedSub}
         onClose={() => setSelectedSub(null)}
-        allTags={allTagsList.map(t => t.tag)}
+        allTags={allTagsList.map(tg => tg.tag)}
         onUpdated={updated => {
           setSubscribers(ss => ss.map(x => x.id === updated.id ? updated : x));
           setSelectedSub(updated);
@@ -471,7 +488,7 @@ export default function ClientsScreen({ user }) {
       />
 
       {/* FAB */}
-      {canEdit && (
+      {canEdit && tab !== 'contacts' && (
         <button
           onClick={() => tab === 'mailings' ? setOrderSheet(true) : setTemplateSheet(true)}
           style={{
@@ -572,4 +589,3 @@ export default function ClientsScreen({ user }) {
     </div>
   );
 }
-

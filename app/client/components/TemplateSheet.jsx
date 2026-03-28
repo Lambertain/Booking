@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../api.js';
-
-const STEP_LABELS = {
-  'В работе': 'В роботі',
-  'Удалить': 'Видалити',
-  'Готово': 'Виконано',
-};
+import { useLang } from '../i18n/useLang.js';
 
 const STEP_COLORS = {
   'В работе': 'var(--accent)',
   'Удалить': 'var(--red)',
   'Готово': 'var(--green)',
 };
+
+const STEP_LABEL_KEY = { 'В работе': 'inWork', 'Готово': 'done', 'Удалить': 'delete' };
 
 function fmt(d) {
   if (!d) return '—';
@@ -30,11 +27,17 @@ function Row({ label, value }) {
 }
 
 export default function TemplateSheet({ template, onClose, canEdit, onUpdated, allUsers, allSubscribers }) {
+  const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
 
   if (!template) return null;
+
+  function getStepLabel(s) {
+    const key = STEP_LABEL_KEY[s];
+    return key ? t('templates.stepLabels.' + key) : s;
+  }
 
   function openEdit() {
     setForm({
@@ -77,19 +80,18 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
   }
 
   const stepColor = STEP_COLORS[template.deal_step] || 'var(--text3)';
-  const stepLabel = STEP_LABELS[template.deal_step] || template.deal_step;
 
   return (
-    <Sheet open={!!template} onClose={handleClose} title={editing ? '✏️ Редагування' : (template.name || `#${template.id}`)}>
+    <Sheet open={!!template} onClose={handleClose} title={editing ? t('editing') : (template.name || `#${template.id}`)}>
       {editing && form ? (
         <div>
           <div className="input-group">
-            <div className="input-label">Назва</div>
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Назва шаблону" />
+            <div className="input-label">{t('templates.name')}</div>
+            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder={t('templates.name')} />
           </div>
 
           <div className="input-group">
-            <div className="input-label">Прив'язати до контакту</div>
+            <div className="input-label">{t('templates.linkContact')}</div>
             <select value={form.linked} onChange={e => {
               const val = e.target.value;
               set('linked', val);
@@ -98,19 +100,19 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
                 if (u) { set('created_by', val.slice(5)); set('contact_name', u.name); }
               } else if (val.startsWith('sub_')) {
                 const s = (allSubscribers || []).find(x => String(x.id) === val.slice(4));
-                if (s) { set('contact_name', s.full_name || s.username || ''); }
+                if (s) set('contact_name', s.full_name || s.username || '');
               }
             }}>
-              <option value="">— Оберіть контакт —</option>
+              <option value="">{t('templates.selectContact')}</option>
               {(allUsers || []).length > 0 && (
-                <optgroup label="Системні юзери">
+                <optgroup label={t('templates.systemUsers')}>
                   {(allUsers || []).map(u => (
                     <option key={`user_${u.id}`} value={`user_${u.id}`}>{u.name} ({u.role})</option>
                   ))}
                 </optgroup>
               )}
               {(allSubscribers || []).length > 0 && (
-                <optgroup label="Контакти (бот)">
+                <optgroup label={t('templates.botContacts')}>
                   {(allSubscribers || []).map(s => (
                     <option key={`sub_${s.id}`} value={`sub_${s.id}`}>
                       {s.full_name || s.username || `tg:${s.telegram_id}`}
@@ -122,52 +124,52 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
           </div>
 
           <div className="input-group">
-            <div className="input-label">Статус CRM</div>
+            <div className="input-label">{t('templates.crmStatus')}</div>
             <input value={form.deal_step} onChange={e => set('deal_step', e.target.value)} placeholder="В работе, Удалить..." />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div className="input-group">
-              <div className="input-label">Оренда від</div>
+              <div className="input-label">{t('templates.rentalFrom')}</div>
               <input type="date" value={form.rental_start} onChange={e => set('rental_start', e.target.value)} />
             </div>
             <div className="input-group">
-              <div className="input-label">до</div>
+              <div className="input-label">{t('to')}</div>
               <input type="date" value={form.rental_end} onChange={e => set('rental_end', e.target.value)} />
             </div>
           </div>
 
           <div className="input-group">
-            <div className="input-label">Контакт</div>
+            <div className="input-label">{t('templates.contactName')}</div>
             <input value={form.contact_name} onChange={e => set('contact_name', e.target.value)} />
           </div>
           <div className="input-group">
-            <div className="input-label">Email контакту</div>
+            <div className="input-label">{t('templates.contactEmail')}</div>
             <input type="email" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} />
           </div>
           <div className="input-group">
-            <div className="input-label">Сайти моделі</div>
+            <div className="input-label">{t('templates.modelSites')}</div>
             <input value={form.model_sites} onChange={e => set('model_sites', e.target.value)} placeholder="MM, MK, Modelkartei..." />
           </div>
           <div className="input-group">
-            <div className="input-label">Доступи</div>
+            <div className="input-label">{t('templates.accesses')}</div>
             <textarea rows={2} value={form.accesses} onChange={e => set('accesses', e.target.value)} style={{ resize: 'vertical' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div className="input-group">
-              <div className="input-label">Ціна (EUR)</div>
+              <div className="input-label">{t('templates.price')}</div>
               <input type="number" value={form.price} onChange={e => set('price', e.target.value)} />
             </div>
             <div className="input-group">
-              <div className="input-label">Тип угоди</div>
+              <div className="input-label">{t('templates.dealType')}</div>
               <input value={form.deal_type} onChange={e => set('deal_type', e.target.value)} />
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>Скасувати</button>
+            <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>{t('cancel')}</button>
             <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
-              {saving ? 'Збереження...' : 'Зберегти'}
+              {saving ? t('saving') : t('save')}
             </button>
           </div>
         </div>
@@ -176,7 +178,7 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             {template.deal_step && (
               <span style={{ background: stepColor, color: '#fff', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
-                {stepLabel}
+                {getStepLabel(template.deal_step)}
               </span>
             )}
             {template.price > 0 && (
@@ -186,20 +188,20 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
             )}
           </div>
 
-          <Row label="Контакт" value={template.contact_name} />
-          <Row label="Email" value={template.contact_email} />
-          <Row label="Сайти моделі" value={template.model_sites} />
-          <Row label="Доступи" value={template.accesses} />
-          <Row label="Тип угоди" value={template.deal_type} />
-          <Row label="Відповідальний" value={template.responsible} />
-          <Row label="Оренда від" value={template.rental_start && `${fmt(template.rental_start)} — ${fmt(template.rental_end)}`} />
-          <Row label="Дійсний до" value={!template.rental_start && template.rental_end && fmt(template.rental_end)} />
-          <Row label="Створено" value={fmt(template.created_at)} />
-          <Row label="Deal ID" value={template.deal_id} />
+          <Row label={t('templates.contactName')} value={template.contact_name} />
+          <Row label={t('templates.email')} value={template.contact_email} />
+          <Row label={t('templates.modelSites')} value={template.model_sites} />
+          <Row label={t('templates.accesses')} value={template.accesses} />
+          <Row label={t('templates.dealType')} value={template.deal_type} />
+          <Row label={t('templates.responsible')} value={template.responsible} />
+          <Row label={t('templates.rentalFrom')} value={template.rental_start && `${fmt(template.rental_start)} — ${fmt(template.rental_end)}`} />
+          <Row label={t('templates.validUntil')} value={!template.rental_start && template.rental_end && fmt(template.rental_end)} />
+          <Row label={t('templates.created')} value={fmt(template.created_at)} />
+          <Row label={t('templates.dealId')} value={template.deal_id} />
 
           {canEdit && (
             <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={openEdit}>
-              ✏️ Редагувати
+              {t('editing')}
             </button>
           )}
         </div>
