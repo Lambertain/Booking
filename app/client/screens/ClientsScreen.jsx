@@ -211,12 +211,29 @@ export default function ClientsScreen({ user }) {
                       <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>
                         {o.template_name || o.client_name || o.deal_id || '—'}
                       </div>
-                      <span style={{
-                        background: STATUS_COLORS[o.status] || 'var(--bg3)',
-                        color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-                      }}>
-                        {STATUS_LABELS[o.status] || o.status}
-                      </span>
+                      {canEdit ? (
+                        <select
+                          value={o.status}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => patchOrderStatus(o.id, e.target.value, e)}
+                          style={{
+                            background: STATUS_COLORS[o.status] || 'var(--bg3)',
+                            color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                            border: 'none', cursor: 'pointer', appearance: 'none', outline: 'none',
+                          }}
+                        >
+                          {['new', 'in_progress', 'done', 'cancelled'].map(s => (
+                            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{
+                          background: STATUS_COLORS[o.status] || 'var(--bg3)',
+                          color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                        }}>
+                          {STATUS_LABELS[o.status] || o.status}
+                        </span>
+                      )}
                     </div>
 
                     {/* Meta row */}
@@ -228,33 +245,12 @@ export default function ClientsScreen({ user }) {
                     </div>
 
                     {/* Contact / people row */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)', marginBottom: canEdit ? 8 : 0 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
                       {o.contact_name && <span>👤 {o.contact_name}</span>}
                       {o.client_name && o.client_name !== o.contact_name && <span>🏢 {o.client_name}</span>}
                       {o.model_sites && <span>🌐 {o.model_sites}</span>}
                       {o.deal_step && <span style={{ color: 'var(--text3)' }}>CRM: {o.deal_step}</span>}
                     </div>
-
-                    {/* Inline status buttons */}
-                    {canEdit && (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                        {['new', 'in_progress', 'done', 'cancelled'].map(s => (
-                          <button
-                            key={s}
-                            onClick={e => patchOrderStatus(o.id, s, e)}
-                            style={{
-                              padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 500,
-                              border: `1px solid ${o.status === s ? STATUS_COLORS[s] : 'var(--separator)'}`,
-                              background: o.status === s ? STATUS_COLORS[s] : 'transparent',
-                              color: o.status === s ? '#fff' : 'var(--text3)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {STATUS_LABELS[s]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -310,7 +306,25 @@ export default function ClientsScreen({ user }) {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                         <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>{tpl.name}</div>
-                        {tpl.deal_step && (
+                        {canEdit ? (
+                          <select
+                            value={tpl.deal_step || ''}
+                            onClick={e => e.stopPropagation()}
+                            onChange={e => patchTemplateStep(tpl.id, e.target.value, e)}
+                            style={{
+                              background: stepColor, color: '#fff', borderRadius: 6,
+                              padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                              border: 'none', cursor: 'pointer', appearance: 'none', outline: 'none',
+                            }}
+                          >
+                            <option value="">—</option>
+                            {['В работе', 'Готово', 'Удалить'].map(s => (
+                              <option key={s} value={s}>
+                                {s === 'В работе' ? 'В роботі' : s === 'Готово' ? 'Виконано' : 'Видалити'}
+                              </option>
+                            ))}
+                          </select>
+                        ) : tpl.deal_step && (
                           <span style={{
                             background: stepColor, color: '#fff',
                             borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
@@ -323,36 +337,11 @@ export default function ClientsScreen({ user }) {
                         {tpl.rental_end && <span>⏳ до {fmt(tpl.rental_end)}</span>}
                         {tpl.price > 0 && <span>💶 {tpl.price} EUR</span>}
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)', marginBottom: canEdit ? 8 : 0 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text2)' }}>
                         {tpl.contact_name && <span>👤 {tpl.contact_name}</span>}
                         {tpl.model_sites && <span>🌐 {tpl.model_sites}</span>}
                         {tpl.accesses && <span>🔑 {tpl.accesses.slice(0, 30)}{tpl.accesses.length > 30 ? '…' : ''}</span>}
                       </div>
-
-                      {/* Inline deal_step buttons */}
-                      {canEdit && (
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                          {['В работе', 'Готово', 'Удалить'].map(s => {
-                            const active = tpl.deal_step === s;
-                            const color = STEP_COLORS[s] || 'var(--accent)';
-                            return (
-                              <button
-                                key={s}
-                                onClick={e => patchTemplateStep(tpl.id, s, e)}
-                                style={{
-                                  padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 500,
-                                  border: `1px solid ${active ? color : 'var(--separator)'}`,
-                                  background: active ? color : 'transparent',
-                                  color: active ? '#fff' : 'var(--text3)',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                {s === 'В работе' ? 'В роботі' : s === 'Готово' ? 'Виконано' : 'Видалити'}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
