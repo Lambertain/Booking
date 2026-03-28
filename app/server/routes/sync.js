@@ -12,7 +12,7 @@ router.post('/shoot', async (req, res) => {
     }
 
     const { modelSlug, photographerName, photographerSite, dialogUrl,
-            shootDate, location, rate, currency, notes } = req.body;
+            shootDate, location, rate, currency, notes, status } = req.body;
 
     if (!modelSlug || !photographerName) {
       return res.status(400).json({ error: 'modelSlug and photographerName required' });
@@ -28,10 +28,11 @@ router.post('/shoot', async (req, res) => {
     const shoot = await one(
       `INSERT INTO shoots (model_id, photographer_name, photographer_site, dialog_url,
         shoot_date, location, rate, currency, status, notes, synced_from_bot_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'confirmed',$9,NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
        RETURNING *`,
       [modelRow.id, photographerName, photographerSite || null, dialogUrl || null,
-       shootDate || null, location || null, rate || null, currency || 'EUR', notes || null]
+       shootDate || null, location || null, rate || null, currency || 'EUR',
+       status || 'negotiating', notes || null]
     );
 
     console.log(`[sync] Shoot created: ${photographerName} → model ${modelSlug} (id ${shoot.id})`);

@@ -182,15 +182,47 @@ async function handleApprovalResult(action, text) {
       }) + '\n', 'utf8');
     } catch {}
 
-    // Record shoot in Airtable (per-model credentials)
+    // Extract shoot details (used for both Airtable and app sync)
+    let shootDetails = null;
+    try {
+      shootDetails = await extractShootDetails(item.messages, item.photographer, item.siteLabel);
+    } catch (e) { console.error('[bot] extractShootDetails failed:', e.message); }
+
+    // Record in Airtable (fallback)
     try {
       const config = JSON.parse(fs.readFileSync(path.join(MODELS_DIR, modelSlug, 'config.json'), 'utf8'));
-      if (config.airtable?.baseId) {
+      if (config.airtable?.baseId && shootDetails) {
         setAirtableBase(config.airtable.baseId);
-        const details = await extractShootDetails(item.messages, item.photographer, item.siteLabel);
-        if (details) await recordShoot({ ...details, photographer: item.photographer, siteName: item.siteLabel });
+        await recordShoot({ ...shootDetails, photographer: item.photographer, siteName: item.siteLabel });
       }
     } catch {}
+
+    // Record in app (primary)
+    try {
+      const appUrl = process.env.APP_API_URL;
+      const secret = process.env.APP_API_SECRET;
+      if (appUrl && secret) {
+        const payload = {
+          modelSlug,
+          photographerName: item.photographer,
+          photographerSite: item.siteLabel || null,
+          dialogUrl: item.url || null,
+          shootDate: shootDetails?.startTime || null,
+          location: shootDetails?.location || shootDetails?.city || null,
+          rate: shootDetails?.budget || null,
+          currency: 'EUR',
+          notes: [shootDetails?.style, shootDetails?.notes].filter(Boolean).join(' | ') || null,
+          status: shootDetails?.status === 'Подтверждено' ? 'confirmed' : 'negotiating',
+        };
+        const syncRes = await fetch(`${appUrl}/api/sync/shoot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${secret}` },
+          body: JSON.stringify(payload),
+        });
+        if (syncRes.ok) console.log(`[bot] ✓ Shoot synced to app: ${item.photographer}`);
+        else console.error(`[bot] App sync failed: ${syncRes.status} ${await syncRes.text()}`);
+      }
+    } catch (e) { console.error('[bot] App sync error:', e.message); }
 
     console.log(`[bot] ${action === 'approve' ? '✅' : '✏️'} ${item.photographer} — чекаємо доставку`);
   } else {
