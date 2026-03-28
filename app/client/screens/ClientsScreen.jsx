@@ -4,6 +4,8 @@ import { useLang } from '../i18n/useLang.js';
 import Sheet from '../components/Sheet.jsx';
 import OrderSheet from '../components/OrderSheet.jsx';
 import TemplateSheet from '../components/TemplateSheet.jsx';
+import SubscriberSheet from '../components/SubscriberSheet.jsx';
+import TagManagerSheet from '../components/TagManagerSheet.jsx';
 import Avatar from '../components/Avatar.jsx';
 
 const ORDER_STATUSES = ['all', 'new', 'in_progress', 'done', 'cancelled'];
@@ -36,9 +38,12 @@ export default function ClientsScreen({ user }) {
 
   // Contacts tab state
   const [subscribers, setSubscribers] = useState([]);
+  const [allTagsList, setAllTagsList] = useState([]);
   const [subSearch, setSubSearch] = useState('');
   const [subStatus, setSubStatus] = useState('active');
   const [subLoading, setSubLoading] = useState(false);
+  const [selectedSub, setSelectedSub] = useState(null);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
   // Filter state
   const [orderFilter, setOrderFilter] = useState('all');
@@ -73,12 +78,23 @@ export default function ClientsScreen({ user }) {
     }).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (tab !== 'contacts' || !canEdit) return;
+  function loadSubscribers() {
+    if (!canEdit) return;
     setSubLoading(true);
-    const q = new URLSearchParams({ status: subStatus });
+    const q = new URLSearchParams();
+    if (subStatus) q.set('status', subStatus);
     if (subSearch.trim()) q.set('search', subSearch.trim());
     api.get(`/api/broadcast/list?${q}`).then(setSubscribers).finally(() => setSubLoading(false));
+  }
+
+  function loadTags() {
+    api.get('/api/broadcast/tags').then(d => setAllTagsList(d.tags || []));
+  }
+
+  useEffect(() => {
+    if (tab !== 'contacts' || !canEdit) return;
+    loadSubscribers();
+    if (allTagsList.length === 0) loadTags();
   }, [tab, subSearch, subStatus]);
 
   async function createOrder() {
@@ -286,17 +302,27 @@ export default function ClientsScreen({ user }) {
 
       {tab === 'contacts' && canEdit && (
         <div style={{ padding: '0 16px 80px' }}>
-          {/* Search + status filter */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          {/* Search bar + tag manager button */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input
               value={subSearch}
               onChange={e => setSubSearch(e.target.value)}
               placeholder="Пошук по імені / @username..."
               style={{ flex: 1 }}
             />
+            <button
+              className="btn btn-secondary"
+              onClick={() => setTagManagerOpen(true)}
+              title="Управління тегами"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              🏷️ Теги
+            </button>
           </div>
+
+          {/* Status filter chips */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            {['active', 'blocked', ''].map(s => (
+            {[['active', '✅ Активні'], ['blocked', '🚫 Заблоковані'], ['', '🔍 Всі']].map(([s, label]) => (
               <button
                 key={s}
                 onClick={() => setSubStatus(s)}
@@ -307,7 +333,7 @@ export default function ClientsScreen({ user }) {
                   color: subStatus === s ? '#fff' : 'var(--text2)',
                 }}
               >
-                {s === 'active' ? '✅ Активні' : s === 'blocked' ? '🚫 Заблоковані' : '🔍 Всі'}
+                {label}
               </button>
             ))}
           </div>
@@ -324,8 +350,9 @@ export default function ClientsScreen({ user }) {
               {subscribers.map((sub, idx) => (
                 <div
                   key={sub.id}
+                  onClick={() => setSelectedSub(sub)}
                   style={{
-                    padding: '10px 16px',
+                    padding: '10px 16px', cursor: 'pointer',
                     borderBottom: idx < subscribers.length - 1 ? '1px solid var(--separator)' : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}
@@ -341,7 +368,7 @@ export default function ClientsScreen({ user }) {
                     </div>
                     {sub.tags?.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                        {sub.tags.map(tag => (
+                        {sub.tags.slice(0, 4).map(tag => (
                           <span key={tag} style={{
                             background: 'var(--accent-bg)', color: 'var(--accent)',
                             borderRadius: 6, padding: '1px 6px', fontSize: 11,
@@ -349,10 +376,13 @@ export default function ClientsScreen({ user }) {
                             {tag}
                           </span>
                         ))}
+                        {sub.tags.length > 4 && (
+                          <span style={{ fontSize: 11, color: 'var(--text3)' }}>+{sub.tags.length - 4}</span>
+                        )}
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 }}>
                     {sub.last_activity_at ? fmt(sub.last_activity_at) : fmt(sub.subscribed_at)}
                   </div>
                 </div>
@@ -360,10 +390,32 @@ export default function ClientsScreen({ user }) {
             </div>
           )}
           <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
-            {subscribers.length} контактів (макс. 200)
+            {subscribers.length} контактів
           </div>
         </div>
       )}
+
+      {/* Subscriber detail/edit sheet */}
+      <SubscriberSheet
+        subscriber={selectedSub}
+        onClose={() => setSelectedSub(null)}
+        allTags={allTagsList.map(t => t.tag)}
+        onUpdated={updated => {
+          setSubscribers(ss => ss.map(x => x.id === updated.id ? updated : x));
+          setSelectedSub(updated);
+        }}
+      />
+
+      {/* Tag manager sheet */}
+      <TagManagerSheet
+        open={tagManagerOpen}
+        onClose={() => setTagManagerOpen(false)}
+        tags={allTagsList}
+        onTagsChanged={() => {
+          loadTags();
+          loadSubscribers();
+        }}
+      />
 
       {/* FAB */}
       {canEdit && (

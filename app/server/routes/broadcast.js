@@ -51,6 +51,57 @@ router.get('/list', requireAuth('admin', 'manager'), async (req, res) => {
   }
 });
 
+// PATCH /api/broadcast/subscriber/:id — update tags, status, full_name
+router.patch('/subscriber/:id', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const { tags, status, full_name } = req.body;
+    const updates = [];
+    const vals = [];
+    let i = 1;
+    if (tags !== undefined)      { updates.push(`tags = $${i++}`);      vals.push(tags); }
+    if (status !== undefined)    { updates.push(`status = $${i++}`);    vals.push(status); }
+    if (full_name !== undefined) { updates.push(`full_name = $${i++}`); vals.push(full_name); }
+    if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.id);
+    const row = await query(
+      `UPDATE subscribers SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
+      vals
+    );
+    res.json(row.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/broadcast/tag-rename — rename a tag across all subscribers
+router.patch('/tag-rename', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const { oldName, newName } = req.body;
+    if (!oldName || !newName) return res.status(400).json({ error: 'oldName and newName required' });
+    const result = await query(
+      `UPDATE subscribers SET tags = array_replace(tags, $1, $2) WHERE $1 = ANY(tags)`,
+      [oldName, newName]
+    );
+    res.json({ ok: true, updated: result.rowCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/broadcast/tag/:name — remove a tag from all subscribers
+router.delete('/tag/:name', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const result = await query(
+      `UPDATE subscribers SET tags = array_remove(tags, $1) WHERE $1 = ANY(tags)`,
+      [name]
+    );
+    res.json({ ok: true, updated: result.rowCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/broadcast/tags — all unique tags with subscriber counts
 router.get('/tags', requireAuth('admin', 'manager'), async (req, res) => {
   try {
