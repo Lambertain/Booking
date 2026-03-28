@@ -11,7 +11,8 @@ router.post('/shoot', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { modelSlug, photographerName, photographerSite, dialogUrl,
+    const { modelSlug, photographerName, photographerSite, photographerEmail,
+            photographerPhone, photographerTelegram, dialogUrl,
             shootDate, location, rate, currency, notes, status } = req.body;
 
     if (!modelSlug || !photographerName) {
@@ -26,13 +27,15 @@ router.post('/shoot', async (req, res) => {
     if (!modelRow) return res.status(404).json({ error: `Model not found: ${modelSlug}` });
 
     const shoot = await one(
-      `INSERT INTO shoots (model_id, photographer_name, photographer_site, dialog_url,
-        shoot_date, location, rate, currency, status, notes, synced_from_bot_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+      `INSERT INTO shoots (model_id, photographer_name, photographer_site,
+        photographer_email, photographer_phone, photographer_telegram,
+        dialog_url, shoot_date, location, rate, currency, status, notes, synced_from_bot_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
        RETURNING *`,
-      [modelRow.id, photographerName, photographerSite || null, dialogUrl || null,
-       shootDate || null, location || null, rate || null, currency || 'EUR',
-       status || 'negotiating', notes || null]
+      [modelRow.id, photographerName, photographerSite || null,
+       photographerEmail || null, photographerPhone || null, photographerTelegram || null,
+       dialogUrl || null, shootDate || null, location || null,
+       rate || null, currency || 'EUR', status || 'negotiating', notes || null]
     );
 
     console.log(`[sync] Shoot created: ${photographerName} → model ${modelSlug} (id ${shoot.id})`);

@@ -295,10 +295,14 @@ Respond with ONLY a valid JSON object, no markdown, no explanation:
   "startTime": "ISO 8601 datetime" or null,
   "durationHours": number or null,
   "budget": number or null,
+  "currency": "EUR" or "USD" or "GBP" or "PLN" or null,
   "expenses": number or null,
   "style": "shooting style/level description" or null,
   "notes": "any other relevant details" or null,
-  "status": "Резерв" or "Подтверждено"
+  "status": "Резерв" or "Подтверждено",
+  "photographer_email": "email if mentioned" or null,
+  "photographer_phone": "phone number if mentioned" or null,
+  "photographer_telegram": "@username if mentioned" or null
 }`;
 
   const res = await fetch(API_URL, {

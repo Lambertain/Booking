@@ -202,15 +202,19 @@ async function handleApprovalResult(action, text) {
       const appUrl = process.env.APP_API_URL;
       const secret = process.env.APP_API_SECRET;
       if (appUrl && secret) {
+        const location = [shootDetails?.city, shootDetails?.location].filter(Boolean).join(', ') || null;
         const payload = {
           modelSlug,
           photographerName: item.photographer,
           photographerSite: item.siteLabel || null,
+          photographerEmail: shootDetails?.photographer_email || null,
+          photographerPhone: shootDetails?.photographer_phone || null,
+          photographerTelegram: shootDetails?.photographer_telegram || null,
           dialogUrl: item.url || null,
           shootDate: shootDetails?.startTime || null,
-          location: shootDetails?.location || shootDetails?.city || null,
+          location,
           rate: shootDetails?.budget || null,
-          currency: 'EUR',
+          currency: shootDetails?.currency || 'EUR',
           notes: [shootDetails?.style, shootDetails?.notes].filter(Boolean).join(' | ') || null,
           status: shootDetails?.status === 'Подтверждено' ? 'confirmed' : 'negotiating',
         };
