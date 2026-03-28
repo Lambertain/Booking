@@ -30,16 +30,16 @@ router.get('/', requireAuth('admin', 'manager', 'client'), async (req, res) => {
     if (role === 'client') {
       rows = await all(
         `SELECT o.*, u.name as client_name FROM mailing_orders o
-         JOIN clients c ON c.id = o.client_id
-         JOIN users u ON u.id = c.user_id
+         LEFT JOIN clients c ON c.id = o.client_id
+         LEFT JOIN users u ON u.id = c.user_id
          WHERE c.user_id = $1 ORDER BY o.created_at DESC`,
         [id]
       );
     } else {
       rows = await all(
         `SELECT o.*, u.name as client_name FROM mailing_orders o
-         JOIN clients c ON c.id = o.client_id
-         JOIN users u ON u.id = c.user_id
+         LEFT JOIN clients c ON c.id = o.client_id
+         LEFT JOIN users u ON u.id = c.user_id
          ORDER BY o.created_at DESC`,
         []
       );

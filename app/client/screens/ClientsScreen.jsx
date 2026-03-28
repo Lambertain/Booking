@@ -97,7 +97,7 @@ export default function ClientsScreen({ user }) {
                 <div key={o.id} className="list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontWeight: 600, fontSize: 15 }}>
-                      {o.client_name || t('noData')}
+                      {o.template_name || o.client_name || o.deal_id || t('noData')}
                     </div>
                     {canEdit ? (
                       <select
@@ -113,15 +113,19 @@ export default function ClientsScreen({ user }) {
                       <span className={`badge badge-${o.status}`}>{t(`mailings.statusLabels.${o.status}`)}</span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                    {t(`mailings.orderTypeLabels.${o.order_type || 'rent'}`)}
-                    {o.rental_start && ` · ${formatDate(o.rental_start)} – ${formatDate(o.rental_end)}`}
+                  <div style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+                    {o.deal_step && <span>📌 {o.deal_step}</span>}
+                    {o.order_type && <span>{t(`mailings.orderTypeLabels.${o.order_type}`)}</span>}
+                    {o.rental_start && <span>📅 {formatDate(o.rental_start)} – {formatDate(o.rental_end)}</span>}
+                    {o.tour_start_2 && <span>📅2 {formatDate(o.tour_start_2)} – {formatDate(o.tour_end_2)}</span>}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-                    {o.target_sites && <span>🌐 {o.target_sites}</span>}
-                    {o.target_regions && <span>🗺 {o.target_regions}</span>}
-                    {o.volume && <span>📊 {o.volume}</span>}
-                    {o.price && <span>💶 {o.price}</span>}
+                    {o.contact_name && <span>👤 {o.contact_name}</span>}
+                    {o.contact_email && <span>✉️ {o.contact_email}</span>}
+                    {o.client_name && <span>🏢 {o.client_name}</span>}
+                    {o.model_sites && <span>🌐 {o.model_sites}</span>}
+                    {o.responsible && <span>🧑‍💼 {o.responsible.split(' ')[0]}</span>}
+                    {o.price > 0 && <span>💶 {o.price}</span>}
                   </div>
                   {o.notes && <div style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>{o.notes}</div>}
                   <div style={{ fontSize: 11, color: 'var(--text3)' }}>{formatDate(o.created_at)}</div>
@@ -143,12 +147,22 @@ export default function ClientsScreen({ user }) {
             <div className="card">
               {templates.map(tpl => (
                 <div key={tpl.id} className="list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{tpl.name}</div>
-                  {(tpl.rental_start || tpl.rental_end) && (
-                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                      📅 {formatDate(tpl.rental_start)} – {formatDate(tpl.rental_end)}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{tpl.name}</div>
+                    {tpl.deal_step && (
+                      <span style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap' }}>📌 {tpl.deal_step}</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+                    {tpl.rental_end && <span>⏳ до {formatDate(tpl.rental_end)}</span>}
+                    {tpl.price > 0 && <span>💶 {tpl.price}</span>}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+                    {tpl.contact_name && <span>👤 {tpl.contact_name}</span>}
+                    {tpl.contact_email && <span>✉️ {tpl.contact_email}</span>}
+                    {tpl.model_sites && <span>🌐 {tpl.model_sites}</span>}
+                    {tpl.accesses && <span>🔑 {tpl.accesses}</span>}
+                  </div>
                 </div>
               ))}
             </div>
