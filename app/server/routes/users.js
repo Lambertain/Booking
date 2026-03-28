@@ -142,6 +142,15 @@ router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (re
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    // Managers can only edit profiles of their assigned models
+    if (role === 'manager') {
+      const assigned = await one(
+        'SELECT 1 FROM manager_models WHERE manager_id = $1 AND model_id = $2',
+        [callerId, targetId]
+      );
+      if (!assigned) return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const updates = [];
     const vals = [];
     let i = 1;
@@ -177,16 +186,6 @@ router.patch('/:id/profile', requireAuth('admin', 'manager', 'model'), async (re
   }
 });
 
-// DELETE /api/users/:id
-router.delete('/:id', requireAuth('admin'), async (req, res) => {
-  try {
-    await query('DELETE FROM users WHERE id = $1', [req.params.id]);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // POST /api/users/manager-models — assign model to manager
 router.post('/manager-models', requireAuth('admin'), async (req, res) => {
   try {
@@ -206,6 +205,16 @@ router.delete('/manager-models', requireAuth('admin'), async (req, res) => {
   try {
     const { manager_id, model_id } = req.body;
     await query('DELETE FROM manager_models WHERE manager_id=$1 AND model_id=$2', [manager_id, model_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/users/:id
+router.delete('/:id', requireAuth('admin'), async (req, res) => {
+  try {
+    await query('DELETE FROM users WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

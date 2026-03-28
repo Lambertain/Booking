@@ -80,6 +80,8 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
       const updated = await api.patch(`/api/orders/${order.id}`, payload);
       onUpdated?.(updated);
       setEditing(false);
+    } catch (err) {
+      alert(err.message);
     } finally {
       setSaving(false);
     }

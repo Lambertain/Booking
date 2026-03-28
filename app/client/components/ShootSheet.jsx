@@ -37,6 +37,8 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
       const updated = await api.patch(`/api/shoots/${shoot.id}`, form);
       onShootUpdated?.(updated);
       setEditing(false);
+    } catch (err) {
+      alert(err.message);
     } finally {
       setSaving(false);
     }
@@ -56,17 +58,17 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
   const tgHandle = shoot.photographer_telegram?.replace(/^@/, '');
 
   return (
-    <Sheet open={!!shoot} onClose={handleClose} title={editing ? 'Редактировать съёмку' : (shoot.photographer_name || '—')}>
+    <Sheet open={!!shoot} onClose={handleClose} title={editing ? t('editing') : (shoot.photographer_name || '—')}>
       {editing && form ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, overflowY: 'auto', maxHeight: '65vh' }}>
-          <div className="list-section-title" style={{ marginBottom: 6 }}>Фотограф</div>
+          <div className="list-section-title" style={{ marginBottom: 6 }}>{t('shoots.photographer')}</div>
           {[
-            { key: 'photographer_name',     label: 'Имя',      ph: 'Имя фотографа' },
-            { key: 'photographer_site',     label: 'Сайт',     ph: 'purpleport / modelmayhem' },
-            { key: 'photographer_email',    label: 'Email',    ph: 'email@example.com', type: 'email' },
-            { key: 'photographer_phone',    label: 'Телефон',  ph: '+49 ...',            type: 'tel' },
-            { key: 'photographer_telegram', label: 'Telegram', ph: '@username' },
-            { key: 'dialog_url',            label: 'Диалог',   ph: 'https://...' },
+            { key: 'photographer_name',     label: t('shoots.name'),    ph: t('shoots.photographer') },
+            { key: 'photographer_site',     label: t('shoots.site'),    ph: 'purpleport / modelmayhem' },
+            { key: 'photographer_email',    label: 'Email',             ph: 'email@example.com', type: 'email' },
+            { key: 'photographer_phone',    label: t('shoots.phone'),   ph: '+49 ...', type: 'tel' },
+            { key: 'photographer_telegram', label: 'Telegram',          ph: '@username' },
+            { key: 'dialog_url',            label: t('shoots.dialog'),  ph: 'https://...' },
           ].map(f => (
             <div className="input-group" key={f.key}>
               <div className="input-label">{f.label}</div>
@@ -79,22 +81,22 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
             </div>
           ))}
 
-          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Съёмка</div>
+          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>{t('shoots.title')}</div>
           <div className="input-group">
-            <div className="input-label">Дата</div>
+            <div className="input-label">{t('shoots.date')}</div>
             <input type="date" value={form.shoot_date} onChange={e => setForm(p => ({ ...p, shoot_date: e.target.value }))} />
           </div>
           <div className="input-group">
-            <div className="input-label">Локация</div>
-            <input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} placeholder="Город, место" />
+            <div className="input-label">{t('shoots.location')}</div>
+            <input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div className="input-group" style={{ flex: 1 }}>
-              <div className="input-label">Ставка</div>
+              <div className="input-label">{t('shoots.rate')}</div>
               <input type="number" value={form.rate} onChange={e => setForm(p => ({ ...p, rate: e.target.value }))} placeholder="0" />
             </div>
             <div className="input-group" style={{ width: 80 }}>
-              <div className="input-label">Валюта</div>
+              <div className="input-label">{t('shoots.currency')}</div>
               <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}>
                 <option value="EUR">EUR</option>
                 <option value="USD">USD</option>
@@ -104,20 +106,20 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
             </div>
           </div>
           <div className="input-group">
-            <div className="input-label">Статус</div>
+            <div className="input-label">{t('shoots.status')}</div>
             <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
               {STATUSES.map(s => <option key={s} value={s}>{t(`shoots.statusLabels.${s}`)}</option>)}
             </select>
           </div>
           <div className="input-group">
-            <div className="input-label">Заметки</div>
-            <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Условия, детали..." />
+            <div className="input-label">{t('shoots.notes')}</div>
+            <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={3} />
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditing(false)}>Отмена</button>
+            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditing(false)}>{t('cancel')}</button>
             <button className="btn btn-primary" style={{ flex: 2 }} onClick={save} disabled={saving}>
-              {saving ? '...' : t('save')}
+              {saving ? t('saving') : t('save')}
             </button>
           </div>
         </div>
@@ -135,9 +137,9 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
 
           {/* Shoot info */}
           {[
-            shoot.location && { label: 'Локация', value: shoot.location },
-            shoot.rate     && { label: 'Ставка',  value: `${shoot.rate} ${shoot.currency}`, bold: true },
-            shoot.photographer_site && { label: 'Площадка', value: shoot.photographer_site },
+            shoot.location && { label: t('shoots.location'), value: shoot.location },
+            shoot.rate     && { label: t('shoots.rate'),     value: `${shoot.rate} ${shoot.currency}`, bold: true },
+            shoot.photographer_site && { label: t('shoots.venue'), value: shoot.photographer_site },
           ].filter(Boolean).map(row => (
             <div key={row.label} className="detail-row">
               <span style={{ color: 'var(--text3)', fontSize: 13 }}>{row.label}</span>
@@ -148,7 +150,7 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
           {/* Photographer contacts */}
           {(shoot.photographer_email || shoot.photographer_phone || shoot.photographer_telegram || shoot.dialog_url) && (
             <>
-              <div className="list-section-title" style={{ margin: '12px 0 4px' }}>Контакты фотографа</div>
+              <div className="list-section-title" style={{ margin: '12px 0 4px' }}>{t('shoots.photographerContacts')}</div>
               {shoot.photographer_email && (
                 <div className="detail-row">
                   <span style={{ color: 'var(--text3)', fontSize: 13 }}>Email</span>
@@ -159,7 +161,7 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
               )}
               {shoot.photographer_phone && (
                 <div className="detail-row">
-                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>Телефон</span>
+                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>{t('shoots.phone')}</span>
                   <a href={`tel:${shoot.photographer_phone}`} style={{ fontSize: 14, color: 'var(--accent)' }}>
                     {shoot.photographer_phone}
                   </a>
@@ -175,9 +177,9 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
               )}
               {shoot.dialog_url && (
                 <div className="detail-row">
-                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>Диалог</span>
+                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>{t('shoots.dialog')}</span>
                   <a href={shoot.dialog_url} target="_blank" rel="noreferrer" style={{ fontSize: 14, color: 'var(--accent)' }}>
-                    Открыть
+                    {t('shoots.open')}
                   </a>
                 </div>
               )}
@@ -194,14 +196,14 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
           {canEdit && (
             <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={openEdit}>
-                Редактировать
+                {t('edit')}
               </button>
             </div>
           )}
 
           {canEdit && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>Сменить статус</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>{t('shoots.changeStatus')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {STATUSES.map(s => (
                   <button
