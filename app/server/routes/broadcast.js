@@ -35,8 +35,9 @@ router.get('/list', requireAuth('admin', 'manager'), async (req, res) => {
     if (status) { conditions.push(`status = $${i++}`); vals.push(status); }
     if (tag)    { conditions.push(`tags @> $${i++}`);  vals.push([tag]); }
     if (search) {
+      const term = search.startsWith('@') ? search.slice(1) : search;
       conditions.push(`(full_name ILIKE $${i} OR username ILIKE $${i})`);
-      vals.push(`%${search}%`); i++;
+      vals.push(`%${term}%`); i++;
     }
     const rows = await all(
       `SELECT id, telegram_id, username, full_name, status, tags, subscribed_at, last_activity_at
