@@ -63,18 +63,22 @@ export default function ClientsScreen({ user }) {
 
   const canEdit = user.role === 'admin' || user.role === 'manager';
 
+  const [pickerSubs, setPickerSubs] = useState([]);
+
   useEffect(() => {
     const loads = [
       api.get('/api/orders'),
       api.get('/api/templates'),
       canEdit ? api.get('/api/orders/clients') : Promise.resolve([]),
       canEdit ? api.get('/api/users') : Promise.resolve([]),
+      canEdit ? api.get('/api/broadcast/list?status=active') : Promise.resolve([]),
     ];
-    Promise.all(loads).then(([o, tpl, cl, users]) => {
+    Promise.all(loads).then(([o, tpl, cl, users, subs]) => {
       setOrders(o);
       setTemplates(tpl);
       setClients(cl);
       setAllUsers(Array.isArray(users) ? users : []);
+      setPickerSubs(Array.isArray(subs) ? subs : []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -497,6 +501,7 @@ export default function ClientsScreen({ user }) {
         onClose={() => setSelectedOrder(null)}
         canEdit={canEdit}
         allUsers={allUsers}
+        allSubscribers={pickerSubs}
         onUpdated={updated => {
           setOrders(os => os.map(x => x.id === updated.id ? updated : x));
           setSelectedOrder(updated);
@@ -509,6 +514,7 @@ export default function ClientsScreen({ user }) {
         onClose={() => setSelectedTemplate(null)}
         canEdit={canEdit}
         allUsers={allUsers}
+        allSubscribers={pickerSubs}
         onUpdated={updated => {
           setTemplates(ts => ts.map(x => x.id === updated.id ? updated : x));
           setSelectedTemplate(updated);

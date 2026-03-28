@@ -1,5 +1,5 @@
 const express = require('express');
-const { one, all } = require('../db');
+const { one, all, query } = require('../db');
 const { requireAuth } = require('../auth');
 
 const router = express.Router();
@@ -54,6 +54,17 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
     if (source_type !== undefined)   { updates.push(`source_type = $${i++}`);   vals.push(source_type); }
     if (deal_type !== undefined)     { updates.push(`deal_type = $${i++}`);     vals.push(deal_type); }
     if (created_by !== undefined)    { updates.push(`created_by = $${i++}`);    vals.push(created_by || null); }
+
+    const { subscriber_id } = req.body;
+    if (subscriber_id !== undefined) {
+      updates.push(`subscriber_id = $${i++}`);
+      vals.push(subscriber_id || null);
+      if (!contact_name && subscriber_id) {
+        const sub = await one('SELECT full_name FROM subscribers WHERE id = $1', [subscriber_id]);
+        if (sub) { updates.push(`contact_name = $${i++}`); vals.push(sub.full_name); }
+      }
+    }
+
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     vals.push(req.params.id);
     const row = await one(`UPDATE mailing_templates SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`, vals);

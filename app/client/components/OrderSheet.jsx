@@ -30,7 +30,7 @@ function Row({ label, value }) {
   );
 }
 
-export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUsers }) {
+export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUsers, allSubscribers }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -53,7 +53,7 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
       price: order.price || '',
       notes: order.notes || '',
       deal_step: order.deal_step || '',
-      user_id: '',
+      linked: '',  // "user_123" or "sub_456"
     });
     setEditing(true);
   }
@@ -64,7 +64,10 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
     setSaving(true);
     try {
       const payload = { ...form };
-      if (!payload.user_id) delete payload.user_id;
+      delete payload.linked;
+      // parse linked value into user_id or subscriber_id
+      if (form.linked?.startsWith('user_')) payload.user_id = parseInt(form.linked.slice(5));
+      else if (form.linked?.startsWith('sub_')) payload.subscriber_id = parseInt(form.linked.slice(4));
       const updated = await api.patch(`/api/orders/${order.id}`, payload);
       onUpdated?.(updated);
       setEditing(false);
@@ -91,17 +94,37 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
           </div>
 
           <div className="input-group">
-            <div className="input-label">Прив'язати до юзера</div>
-            <select value={form.user_id} onChange={e => {
-              const uid = e.target.value;
-              const u = allUsers?.find(x => String(x.id) === uid);
-              set('user_id', uid);
-              if (u) set('contact_name', u.name);
+            <div className="input-label">Прив'язати до контакту</div>
+            <select value={form.linked} onChange={e => {
+              const val = e.target.value;
+              set('linked', val);
+              if (val.startsWith('user_')) {
+                const uid = val.slice(5);
+                const u = (allUsers || []).find(x => String(x.id) === uid);
+                if (u) set('contact_name', u.name);
+              } else if (val.startsWith('sub_')) {
+                const sid = val.slice(4);
+                const s = (allSubscribers || []).find(x => String(x.id) === sid);
+                if (s) { set('contact_name', s.full_name || s.username || ''); }
+              }
             }}>
-              <option value="">— Оберіть юзера —</option>
-              {(allUsers || []).map(u => (
-                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-              ))}
+              <option value="">— Оберіть контакт —</option>
+              {(allUsers || []).length > 0 && (
+                <optgroup label="Системні юзери">
+                  {(allUsers || []).map(u => (
+                    <option key={`user_${u.id}`} value={`user_${u.id}`}>{u.name} ({u.role})</option>
+                  ))}
+                </optgroup>
+              )}
+              {(allSubscribers || []).length > 0 && (
+                <optgroup label="Контакти (бот)">
+                  {(allSubscribers || []).map(s => (
+                    <option key={`sub_${s.id}`} value={`sub_${s.id}`}>
+                      {s.full_name || s.username || `tg:${s.telegram_id}`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -191,7 +214,8 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
           </div>
 
           <Row label="Клієнт" value={order.client_name} />
-          <Row label="Контакт" value={order.contact_name} />
+          <Row label="Контакт (бот)" value={order.subscriber_name && `${order.subscriber_name}${order.subscriber_username ? ` @${order.subscriber_username}` : ''}`} />
+          <Row label="Контакт" value={!order.subscriber_name && order.contact_name} />
           <Row label="Email" value={order.contact_email} />
           <Row label="Тур 1" value={order.rental_start && `${fmt(order.rental_start)} — ${fmt(order.rental_end)}`} />
           <Row label="Тур 2" value={order.tour_start_2 && `${fmt(order.tour_start_2)} — ${fmt(order.tour_end_2)}`} />

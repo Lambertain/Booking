@@ -37,9 +37,12 @@ router.get('/', requireAuth('admin', 'manager', 'client'), async (req, res) => {
       );
     } else {
       rows = await all(
-        `SELECT o.*, u.name as client_name FROM mailing_orders o
+        `SELECT o.*, u.name as client_name,
+                s.full_name as subscriber_name, s.username as subscriber_username, s.telegram_id as subscriber_tg_id
+         FROM mailing_orders o
          LEFT JOIN clients c ON c.id = o.client_id
          LEFT JOIN users u ON u.id = c.user_id
+         LEFT JOIN subscribers s ON s.id = o.subscriber_id
          ORDER BY o.created_at DESC`,
         []
       );
@@ -133,15 +136,29 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
     if (deal_step !== undefined)     { updates.push(`deal_step = $${i++}`);     vals.push(deal_step); }
     if (source_type !== undefined)   { updates.push(`source_type = $${i++}`);   vals.push(source_type); }
 
+    // subscriber_id: direct link to subscribers table
+    const { subscriber_id } = req.body;
+    if (subscriber_id !== undefined) {
+      updates.push(`subscriber_id = $${i++}`);
+      vals.push(subscriber_id || null);
+      // auto-fill contact_name from subscriber if not set
+      if (!contact_name && subscriber_id) {
+        const sub = await one('SELECT full_name FROM subscribers WHERE id = $1', [subscriber_id]);
+        if (sub) { updates.push(`contact_name = $${i++}`); vals.push(sub.full_name); }
+      }
+    }
+
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     vals.push(req.params.id);
 
     await query(`UPDATE mailing_orders SET ${updates.join(', ')} WHERE id = $${i}`, vals);
-    // Return with joined client name
     const row = await one(
-      `SELECT o.*, u.name as client_name FROM mailing_orders o
+      `SELECT o.*, u.name as client_name,
+              s.full_name as subscriber_name, s.username as subscriber_username, s.telegram_id as subscriber_tg_id
+       FROM mailing_orders o
        LEFT JOIN clients c ON c.id = o.client_id
        LEFT JOIN users u ON u.id = c.user_id
+       LEFT JOIN subscribers s ON s.id = o.subscriber_id
        WHERE o.id = $1`,
       [req.params.id]
     );

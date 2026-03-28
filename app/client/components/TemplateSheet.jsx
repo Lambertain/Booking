@@ -29,7 +29,7 @@ function Row({ label, value }) {
   );
 }
 
-export default function TemplateSheet({ template, onClose, canEdit, onUpdated, allUsers }) {
+export default function TemplateSheet({ template, onClose, canEdit, onUpdated, allUsers, allSubscribers }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -49,7 +49,7 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
       contact_email: template.contact_email || '',
       deal_type: template.deal_type || '',
       responsible: template.responsible || '',
-      created_by: '',
+      linked: '',
     });
     setEditing(true);
   }
@@ -60,6 +60,8 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
     setSaving(true);
     try {
       const payload = { ...form };
+      delete payload.linked;
+      if (form.linked?.startsWith('sub_')) payload.subscriber_id = parseInt(form.linked.slice(4));
       if (!payload.created_by) delete payload.created_by;
       const updated = await api.patch(`/api/templates/${template.id}`, payload);
       onUpdated?.(updated);
@@ -87,17 +89,35 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
           </div>
 
           <div className="input-group">
-            <div className="input-label">Прив'язати до юзера</div>
-            <select value={form.created_by} onChange={e => {
-              const uid = e.target.value;
-              const u = allUsers?.find(x => String(x.id) === uid);
-              set('created_by', uid);
-              if (u) set('contact_name', u.name);
+            <div className="input-label">Прив'язати до контакту</div>
+            <select value={form.linked} onChange={e => {
+              const val = e.target.value;
+              set('linked', val);
+              if (val.startsWith('user_')) {
+                const u = (allUsers || []).find(x => String(x.id) === val.slice(5));
+                if (u) { set('created_by', val.slice(5)); set('contact_name', u.name); }
+              } else if (val.startsWith('sub_')) {
+                const s = (allSubscribers || []).find(x => String(x.id) === val.slice(4));
+                if (s) { set('contact_name', s.full_name || s.username || ''); }
+              }
             }}>
-              <option value="">— Оберіть юзера —</option>
-              {(allUsers || []).map(u => (
-                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-              ))}
+              <option value="">— Оберіть контакт —</option>
+              {(allUsers || []).length > 0 && (
+                <optgroup label="Системні юзери">
+                  {(allUsers || []).map(u => (
+                    <option key={`user_${u.id}`} value={`user_${u.id}`}>{u.name} ({u.role})</option>
+                  ))}
+                </optgroup>
+              )}
+              {(allSubscribers || []).length > 0 && (
+                <optgroup label="Контакти (бот)">
+                  {(allSubscribers || []).map(s => (
+                    <option key={`sub_${s.id}`} value={`sub_${s.id}`}>
+                      {s.full_name || s.username || `tg:${s.telegram_id}`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
