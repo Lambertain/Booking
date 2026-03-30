@@ -51,11 +51,36 @@ async function processSendQueue() {
     onDeliveryResult(true, toSend.photographer, toSend.site, null, toSend.url);
   } catch (err) {
     console.error(`[scheduler] ❌ Помилка відправки ${toSend.photographer}: ${err.message}`);
-    // Auto-retry once after 30s before pausing
+
+    // Browser crash — stop profile, wait, retry without counting
+    const isBrowserCrash = err.message.includes('Target page, context or browser has been closed')
+      || err.message.includes('ERR_ABORTED')
+      || err.message.includes('No CDP endpoint')
+      || err.message.includes('Browser closed')
+      || err.message.includes('browserType.connectOverCDP');
+
+    if (isBrowserCrash) {
+      console.log('[scheduler] 🔄 Browser crash detected — restarting AdsPower profile...');
+      try {
+        const { stopProfile } = require('../extractor/adspower');
+        const configPath = path.join(MODELS_DIR, toSend.modelSlug, 'config.json');
+        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        await stopProfile(cfg.adspower.profileId);
+        console.log('[scheduler] AdsPower profile stopped');
+      } catch (stopErr) {
+        console.error('[scheduler] stopProfile error:', stopErr.message);
+      }
+      console.log('[scheduler] Waiting 10s before retry...');
+      await new Promise(r => setTimeout(r, 10000));
+      updateSendFirst({ _retryCount: 0 }); // reset counter for clean retry
+      try { await processSendQueue(); } catch {}
+      return;
+    }
+
+    // Regular error — auto-retry once after 30s, then pause
     const retryCount = toSend._retryCount || 0;
     if (retryCount < 1) {
       console.log(`[scheduler] 🔄 Авто-retry через 30с...`);
-      // Update retryCount in-place (item stays first in queue)
       updateSendFirst({ _retryCount: retryCount + 1 });
       const { onDeliveryResult } = require('../bot/index');
       onDeliveryResult(false, toSend.photographer, toSend.site, `${err.message} (retry через 30с)`);

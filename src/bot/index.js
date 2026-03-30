@@ -552,6 +552,10 @@ async function startBot() {
     } catch {}
   }, 60 * 60 * 1000);
 
+  // Must initialize before handling any updates (grammY requirement)
+  await bot.init();
+  console.log('[bot] grammY initialized:', bot.botInfo.username);
+
   startUpdateServer();
   console.log('Telegram bot started (webhook mode via Railway)');
 }
