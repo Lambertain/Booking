@@ -105,6 +105,7 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
       template_name, contact_name, contact_email, model_sites,
       responsible, price, deal_step, tour_start_2, tour_end_2,
       source_type, user_id,
+      review, lesson, contact_phone, deal_currency,
     } = req.body;
     const updates = [];
     const vals = [];
@@ -139,6 +140,10 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
     if (price !== undefined)         { updates.push(`price = $${i++}`);         vals.push(price || null); }
     if (deal_step !== undefined)     { updates.push(`deal_step = $${i++}`);     vals.push(deal_step); }
     if (source_type !== undefined)   { updates.push(`source_type = $${i++}`);   vals.push(source_type); }
+    if (review !== undefined)        { updates.push(`review = $${i++}`);        vals.push(review); }
+    if (lesson !== undefined)        { updates.push(`lesson = $${i++}`);        vals.push(lesson); }
+    if (contact_phone !== undefined) { updates.push(`contact_phone = $${i++}`); vals.push(contact_phone); }
+    if (deal_currency !== undefined) { updates.push(`deal_currency = $${i++}`); vals.push(deal_currency); }
 
     // subscriber_id: direct link to subscribers table
     const { subscriber_id } = req.body;

@@ -22,6 +22,8 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
       photographer_telegram: shoot.photographer_telegram || '',
       dialog_url: shoot.dialog_url || '',
       shoot_date: shoot.shoot_date ? shoot.shoot_date.slice(0, 10) : '',
+      shoot_time: shoot.shoot_time ? shoot.shoot_time.slice(0, 5) : '',
+      duration_hours: shoot.duration_hours || '',
       location: shoot.location || '',
       rate: shoot.rate || '',
       currency: shoot.currency || 'EUR',
@@ -82,9 +84,19 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
           ))}
 
           <div className="list-section-title" style={{ margin: '12px 0 6px' }}>{t('shoots.title')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="input-group">
+              <div className="input-label">{t('shoots.date')}</div>
+              <input type="date" value={form.shoot_date} onChange={e => setForm(p => ({ ...p, shoot_date: e.target.value }))} />
+            </div>
+            <div className="input-group">
+              <div className="input-label">{t('shoots.startTime')}</div>
+              <input type="time" value={form.shoot_time} onChange={e => setForm(p => ({ ...p, shoot_time: e.target.value }))} />
+            </div>
+          </div>
           <div className="input-group">
-            <div className="input-label">{t('shoots.date')}</div>
-            <input type="date" value={form.shoot_date} onChange={e => setForm(p => ({ ...p, shoot_date: e.target.value }))} />
+            <div className="input-label">{t('shoots.duration')}</div>
+            <input type="number" min="0.5" step="0.5" value={form.duration_hours} onChange={e => setForm(p => ({ ...p, duration_hours: e.target.value }))} placeholder="2" />
           </div>
           <div className="input-group">
             <div className="input-label">{t('shoots.location')}</div>
@@ -138,6 +150,8 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
           {/* Shoot info */}
           {[
             shoot.location && { label: t('shoots.location'), value: shoot.location },
+            shoot.shoot_time && { label: t('shoots.startTime'), value: shoot.shoot_time.slice(0, 5) },
+            shoot.duration_hours && { label: t('shoots.duration'), value: `${shoot.duration_hours} ${t('shoots.hours')}` },
             shoot.rate     && { label: t('shoots.rate'),     value: `${shoot.rate} ${shoot.currency}`, bold: true },
             shoot.photographer_site && { label: t('shoots.venue'), value: shoot.photographer_site },
           ].filter(Boolean).map(row => (

@@ -88,6 +88,10 @@ async function main() {
   await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS contact_name TEXT`);
   await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS contact_email TEXT`);
   await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS source_type TEXT`);
+  await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS review TEXT`);
+  await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS lesson TEXT`);
+  await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS contact_phone TEXT`);
+  await pool.query(`ALTER TABLE mailing_orders ADD COLUMN IF NOT EXISTS deal_currency TEXT`);
 
   const raw = fs.readFileSync(CSV_FILE, 'utf8');
   const rows = parseCSV(raw);
@@ -111,8 +115,12 @@ async function main() {
     const modelSites  = r['"модельные сайты"']?.trim() || r['модельные сайты']?.trim() || null;
     const contactName  = r['contact_1_fullName']?.trim() || null;
     const contactEmail = r['contact_1_emails']?.trim() || null;
-    const sourceType   = r['deal_source_type']?.trim() || null;
-    const createdAt    = r['deal_created_at']?.trim() || null;
+    const sourceType     = r['deal_source_type']?.trim() || null;
+    const createdAt      = r['deal_created_at']?.trim() || null;
+    const review         = r['Отзыв']?.trim() || null;
+    const lesson         = r['УРОК']?.trim() || null;
+    const contactPhone   = r['contact_1_phones']?.trim() || null;
+    const dealCurrency   = r['deal_currency']?.trim() || null;
     const orderType    = 'rent'; // default
 
     try {
@@ -121,9 +129,12 @@ async function main() {
            (deal_id, template_name, status, price, order_type,
             rental_start, rental_end, tour_start_2, tour_end_2,
             deal_step, responsible, model_sites,
-            contact_name, contact_email, source_type, created_at)
+            contact_name, contact_email, source_type,
+            review, lesson, contact_phone, deal_currency,
+            created_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-                 COALESCE($16::timestamptz, NOW()))
+                 $16,$17,$18,$19,
+                 COALESCE($20::timestamptz, NOW()))
          ON CONFLICT (deal_id) DO UPDATE SET
            template_name = EXCLUDED.template_name,
            status = EXCLUDED.status,
@@ -137,12 +148,18 @@ async function main() {
            model_sites = EXCLUDED.model_sites,
            contact_name = EXCLUDED.contact_name,
            contact_email = EXCLUDED.contact_email,
-           source_type = EXCLUDED.source_type
+           source_type = EXCLUDED.source_type,
+           review = EXCLUDED.review,
+           lesson = EXCLUDED.lesson,
+           contact_phone = EXCLUDED.contact_phone,
+           deal_currency = EXCLUDED.deal_currency
          RETURNING (xmax = 0) as is_new`,
         [dealId, dealName, status, price, orderType,
          rentalStart, rentalEnd, tourStart2, tourEnd2,
          dealStep, responsible, modelSites,
-         contactName, contactEmail, sourceType, createdAt]
+         contactName, contactEmail, sourceType,
+         review, lesson, contactPhone, dealCurrency,
+         createdAt]
       );
       if (res.rows[0]?.is_new) inserted++; else updated++;
       console.log(`  ${res.rows[0]?.is_new ? 'INSERT' : 'UPDATE'} ${dealId} "${dealName}" [${dealStep}]`);

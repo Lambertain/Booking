@@ -58,9 +58,11 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
       tour_end_2: order.tour_end_2 ? order.tour_end_2.slice(0, 10) : '',
       contact_name: order.contact_name || '',
       contact_email: order.contact_email || '',
+      contact_phone: order.contact_phone || '',
       model_sites: order.model_sites || '',
       responsible: order.responsible || '',
       price: order.price || '',
+      deal_currency: order.deal_currency || '',
       notes: order.notes || '',
       deal_step: order.deal_step || '',
       linked: '',
@@ -179,6 +181,10 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
             <input type="email" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="email@example.com" />
           </div>
           <div className="input-group">
+            <div className="input-label">{t('mailings.contactPhone')}</div>
+            <input type="tel" value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="+38..." />
+          </div>
+          <div className="input-group">
             <div className="input-label">{t('mailings.modelSites')}</div>
             <input value={form.model_sites} onChange={e => set('model_sites', e.target.value)} placeholder="MM, MK..." />
           </div>
@@ -189,7 +195,10 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
             </div>
             <div className="input-group">
               <div className="input-label">{t('mailings.price')}</div>
-              <input type="number" value={form.price} onChange={e => set('price', e.target.value)} />
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input type="number" value={form.price} onChange={e => set('price', e.target.value)} style={{ flex: 1 }} />
+                <input value={form.deal_currency} onChange={e => set('deal_currency', e.target.value)} placeholder="EUR" style={{ width: 52 }} />
+              </div>
             </div>
           </div>
           <div className="input-group">
@@ -226,11 +235,12 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
           <Row label={t('mailings.botContact')} value={order.subscriber_name && `${order.subscriber_name}${order.subscriber_username ? ` @${order.subscriber_username}` : ''}`} />
           <Row label={t('mailings.contact')} value={!order.subscriber_name && order.contact_name} />
           <Row label={t('mailings.contactEmail')} value={order.contact_email} />
+          <Row label={t('mailings.contactPhone')} value={order.contact_phone} />
           <Row label={t('mailings.tour1')} value={order.rental_start && `${fmt(order.rental_start)} — ${fmt(order.rental_end)}`} />
           <Row label={t('mailings.tour2')} value={order.tour_start_2 && `${fmt(order.tour_start_2)} — ${fmt(order.tour_end_2)}`} />
           <Row label={t('mailings.modelSites')} value={order.model_sites} />
           <Row label={t('mailings.responsible')} value={order.responsible} />
-          <Row label={t('mailings.price')} value={order.price > 0 && `${order.price} EUR`} />
+          <Row label={t('mailings.price')} value={order.price > 0 && `${order.price} ${order.deal_currency || 'EUR'}`} />
           <Row label={t('mailings.notes')} value={order.notes} />
           <Row label={t('mailings.created')} value={fmt(order.created_at)} />
           <Row label={t('mailings.dealId')} value={order.deal_id} />
