@@ -9,14 +9,15 @@ const DB_URL = 'postgresql://postgres:KeJNFQKcKihncBIEllYUwNZUMwtfPpKC@gondola.p
 const AT_TOKEN = process.env.AIRTABLE_API_KEY;
 
 const BASES = [
-  { modelId: 6, baseId: 'appiM4XhlAOlOafvs' },
-  { modelId: 5, baseId: 'appUU9lOKDhRSddyQ' },
-  { modelId: 4, baseId: 'appZ2bwcCZxdQ93Zu' },
-  { modelId: 7, baseId: 'apptpDSywL3IuQqNW' },
+  { modelId: 4, baseId: 'appZ2bwcCZxdQ93Zu', name: 'Ana V' },
+  { modelId: 5, baseId: 'appUU9lOKDhRSddyQ', name: 'Kisa' },
+  { modelId: 6, baseId: 'appiM4XhlAOlOafvs', name: 'Victoria Polly' },
+  { modelId: 7, baseId: 'apptpDSywL3IuQqNW', name: 'Violet Spes' },
 ];
 
 const TABLE_SHOOTS        = 'tblZbs1N8UApi3W60';
 const TABLE_PHOTOGRAPHERS = 'tblzr47aNJxLv1hcz';
+const TABLE_SITES         = 'tblStjkeGLDPVIXrh';
 
 const STATUS_MAP = {
   'Реализована':         'done',
@@ -35,7 +36,7 @@ async function atGetAll(baseId, tableId) {
   do {
     const url = `https://api.airtable.com/v0/${baseId}/${tableId}?pageSize=100${offset ? `&offset=${offset}` : ''}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
-    if (!res.ok) { const t = await res.text(); throw new Error(`AT ${res.status}: ${t.slice(0,200)}`); }
+    if (!res.ok) { const t = await res.text(); throw new Error(`AT ${res.status}: ${t.slice(0, 200)}`); }
     const data = await res.json();
     records.push(...data.records);
     offset = data.offset;
@@ -61,11 +62,26 @@ function siteFromUrl(url) {
   return null;
 }
 
-async function processBase(pool, { modelId, baseId }) {
-  console.log(`\n=== model_id=${modelId}  base=${baseId} ===`);
+// Parse time HH:MM from ISO datetime string (UTC)
+function parseTime(dateRaw) {
+  if (!dateRaw) return null;
+  // e.g. "2024-03-15T10:00:00.000Z" → "10:00"
+  const m = dateRaw.match(/T(\d{2}:\d{2})/);
+  return m ? m[1] : null;
+}
+
+// Convert duration in seconds → hours (1 decimal)
+function parseDuration(seconds) {
+  if (!seconds || isNaN(seconds)) return null;
+  return Math.round(seconds / 360) / 10; // rounded to 0.1h
+}
+
+async function processBase(pool, { modelId, baseId, name }) {
+  console.log(`\n=== ${name} (model_id=${modelId}, base=${baseId}) ===`);
 
   // Fetch photographers
-  const phRaw = await atGetAll(baseId, TABLE_PHOTOGRAPHERS);
+  let phRaw = [];
+  try { phRaw = await atGetAll(baseId, TABLE_PHOTOGRAPHERS); } catch (e) { console.warn('  No photographers table:', e.message); }
   console.log(`  Photographers: ${phRaw.length}`);
 
   const phMap = {};
@@ -77,91 +93,138 @@ async function processBase(pool, { modelId, baseId }) {
     const social  = f['Соц сеть/'] || null;
     const siteArr = f['Сайт'] || [];
 
-    let telegram = extractTelegram(phone) || extractTelegram(social);
+    const telegram = extractTelegram(phone) || extractTelegram(social);
     let site = null;
     if (siteArr.length > 0) {
       const sn = siteArr[0].name || '';
       site = siteFromUrl(sn) || (sn.length < 40 ? sn : null);
     }
-    // If name itself is a URL (photographer listed as url)
     const displayName = name.startsWith('http') ? (siteFromUrl(name) || name) : name;
-
     phMap[r.id] = { name: displayName, phone, email, telegram, site };
+  }
+
+  // Fetch sites table for "Источник" resolution
+  const siteMap = {};
+  try {
+    const sitesRaw = await atGetAll(baseId, TABLE_SITES);
+    for (const r of sitesRaw) {
+      const siteName = r.fields['Name'] || r.fields['Название'] || r.fields['Сайт'] || null;
+      if (siteName) siteMap[r.id] = siteName;
+    }
+    console.log(`  Sites: ${sitesRaw.length}`);
+  } catch (e) {
+    console.warn('  No sites table:', e.message);
   }
 
   // Fetch shoots
   const shootRaw = await atGetAll(baseId, TABLE_SHOOTS);
-  console.log(`  Shoots: ${shootRaw.length}`);
+  console.log(`  Shoots total: ${shootRaw.length}`);
 
-  // Filter: only shoots with Статус фотосессии
   const validShoots = shootRaw.filter(r => r.fields['Статус фотосессии']);
   console.log(`  With status: ${validShoots.length}`);
-
-  // Get existing DB shoots
-  const { rows: dbShoots } = await pool.query(
-    'SELECT id, photographer_name, shoot_date::text FROM shoots WHERE model_id = $1',
-    [modelId]
-  );
-  console.log(`  DB shoots: ${dbShoots.length}`);
 
   let updated = 0, inserted = 0, skipped = 0;
 
   for (const r of validShoots) {
     const f = r.fields;
-    const statusRaw = f['Статус фотосессии'];
-    const status    = STATUS_MAP[statusRaw] || 'negotiating';
-    const rate      = f['Бюджет'] || null;
-    const dateRaw   = f['Начало'];
-    const shootDate = dateRaw ? dateRaw.slice(0, 10) : null;
-    const location  = f['Локация'] || f['Город, страна'] || null;
-    const notes     = f['Примечание'] || null;
+    const airtableId = r.id;
 
-    // Get photographer via linked field
+    const statusRaw  = f['Статус фотосессии'];
+    const status     = STATUS_MAP[statusRaw] || 'negotiating';
+    const rate       = f['Бюджет'] || null;
+    const dateRaw    = f['Начало'] || null;
+    const shootDate  = dateRaw ? dateRaw.slice(0, 10) : null;
+    const shootTime  = parseTime(dateRaw);
+    const durationSec = f['Длительность'] || null;
+    const durationHours = parseDuration(durationSec);
+    const location   = f['Локация'] || null;
+    const city       = f['Город, страна'] || null;
+    const notes      = f['Примечание'] || null;
+    const shootStyle = f['Стиль съемки'] || null;
+    const expenses   = f['Расходы'] || null;
+
+    // Resolve Источник linked records → site names
+    const sourceLinks = f['Источник'] || [];
+    const sourceSite  = sourceLinks.length > 0
+      ? (siteMap[sourceLinks[0]] || null)
+      : null;
+
+    // Service payment fields
+    const serviceAmount   = f['Сумма оплаты сервиса'] || null;
+    const serviceCurrency = f['Валюта'] || null;
+    const serviceStatus   = f['Статус сервиса'] || null;
+    const paymentMethod   = f['Способ оплаты'] || null;
+
+    // Photographer
     const phLinks = f['Фотограф'] || [];
-    const phId    = phLinks[0] || null;  // linked record ID
+    const phId    = phLinks[0] || null;
     const ph      = phId ? phMap[phId] : null;
     const phName  = ph?.name || null;
 
     if (!phName || phName.length < 2) { skipped++; continue; }
 
-    const phNameNorm = phName.toLowerCase().trim();
-
-    // Match DB shoot: by name + date, or just name
-    let match = dbShoots.find(s =>
-      s.photographer_name?.toLowerCase().trim() === phNameNorm &&
-      shootDate && s.shoot_date && s.shoot_date.slice(0, 10) === shootDate
+    // Try to find existing shoot by airtable_id first, then by name+date
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM shoots WHERE airtable_id = $1 OR (model_id = $2 AND airtable_id IS NULL AND photographer_name ILIKE $3 AND ($4::date IS NULL OR shoot_date = $4::date)) LIMIT 1',
+      [airtableId, modelId, phName, shootDate]
     );
-    if (!match) {
-      match = dbShoots.find(s =>
-        s.photographer_name?.toLowerCase().trim() === phNameNorm
-      );
-    }
 
-    if (match) {
+    if (existing.length > 0) {
       await pool.query(`
         UPDATE shoots SET
-          status = $1,
-          rate = COALESCE($2::numeric, rate),
-          shoot_date = COALESCE($3::date, shoot_date),
-          location = COALESCE($4, location),
-          notes = COALESCE($5, notes),
-          photographer_email = COALESCE($6, photographer_email),
-          photographer_phone = COALESCE($7, photographer_phone),
-          photographer_telegram = COALESCE($8, photographer_telegram),
-          photographer_site = COALESCE($9, photographer_site)
-        WHERE id = $10
-      `, [status, rate, shootDate, location?.slice(0,200), notes?.slice(0,1000),
-          ph?.email, ph?.phone, ph?.telegram, ph?.site, match.id]);
+          airtable_id          = COALESCE(airtable_id, $1),
+          status               = $2,
+          rate                 = COALESCE($3::numeric, rate),
+          shoot_date           = COALESCE($4::date, shoot_date),
+          shoot_time           = COALESCE($5::time, shoot_time),
+          duration_hours       = COALESCE($6::numeric, duration_hours),
+          location             = COALESCE($7, location),
+          city                 = COALESCE($8, city),
+          notes                = COALESCE($9, notes),
+          photographer_email   = COALESCE($10, photographer_email),
+          photographer_phone   = COALESCE($11, photographer_phone),
+          photographer_telegram = COALESCE($12, photographer_telegram),
+          photographer_site    = COALESCE($13, photographer_site),
+          shoot_style          = COALESCE($14, shoot_style),
+          expenses             = COALESCE($15::numeric, expenses),
+          source_site          = COALESCE($16, source_site),
+          service_amount       = COALESCE($17::numeric, service_amount),
+          service_currency     = COALESCE($18, service_currency),
+          service_status       = COALESCE($19, service_status),
+          payment_method       = COALESCE($20, payment_method)
+        WHERE id = $21
+      `, [
+        airtableId, status,
+        rate, shootDate, shootTime, durationHours,
+        location?.slice(0, 300), city?.slice(0, 200),
+        notes?.slice(0, 2000),
+        ph?.email, ph?.phone, ph?.telegram, ph?.site,
+        shootStyle?.slice(0, 500),
+        expenses, sourceSite,
+        serviceAmount, serviceCurrency, serviceStatus, paymentMethod,
+        existing[0].id,
+      ]);
       updated++;
     } else {
       await pool.query(`
         INSERT INTO shoots
-          (model_id, photographer_name, photographer_site, photographer_email,
-           photographer_phone, photographer_telegram,
-           shoot_date, location, rate, currency, status, notes)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'EUR',$10,$11)
-      `, [modelId, phName, ph?.site, ph?.email, ph?.phone, ph?.telegram,
-          shootDate, location?.slice(0,200), rate, status, notes?.slice(0,1000)]);
+          (model_id, airtable_id, photographer_name, photographer_site,
+           photographer_email, photographer_phone, photographer_telegram,
+           shoot_date, shoot_time, duration_hours,
+           location, city, rate, currency, status, notes,
+           shoot_style, expenses, source_site,
+           service_amount, service_currency, service_status, payment_method)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'EUR',$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        ON CONFLICT DO NOTHING
+      `, [
+        modelId, airtableId, phName, ph?.site,
+        ph?.email, ph?.phone, ph?.telegram,
+        shootDate, shootTime, durationHours,
+        location?.slice(0, 300), city?.slice(0, 200),
+        rate, status, notes?.slice(0, 2000),
+        shootStyle?.slice(0, 500), expenses, sourceSite,
+        serviceAmount, serviceCurrency, serviceStatus, paymentMethod,
+      ]);
       inserted++;
     }
   }

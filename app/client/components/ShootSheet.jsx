@@ -24,11 +24,19 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
       shoot_date: shoot.shoot_date ? shoot.shoot_date.slice(0, 10) : '',
       shoot_time: shoot.shoot_time ? shoot.shoot_time.slice(0, 5) : '',
       duration_hours: shoot.duration_hours || '',
+      city: shoot.city || '',
       location: shoot.location || '',
+      shoot_style: shoot.shoot_style || '',
       rate: shoot.rate || '',
       currency: shoot.currency || 'EUR',
+      expenses: shoot.expenses || '',
+      source_site: shoot.source_site || '',
       status: shoot.status,
       notes: shoot.notes || '',
+      service_amount: shoot.service_amount || '',
+      service_currency: shoot.service_currency || '',
+      service_status: shoot.service_status || '',
+      payment_method: shoot.payment_method || '',
     });
     setEditing(true);
   }
@@ -99,8 +107,16 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
             <input type="number" min="0.5" step="0.5" value={form.duration_hours} onChange={e => setForm(p => ({ ...p, duration_hours: e.target.value }))} placeholder="2" />
           </div>
           <div className="input-group">
+            <div className="input-label">{t('shoots.city')}</div>
+            <input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} />
+          </div>
+          <div className="input-group">
             <div className="input-label">{t('shoots.location')}</div>
             <input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} />
+          </div>
+          <div className="input-group">
+            <div className="input-label">{t('shoots.shootStyle')}</div>
+            <textarea value={form.shoot_style} onChange={e => setForm(p => ({ ...p, shoot_style: e.target.value }))} rows={2} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div className="input-group" style={{ flex: 1 }}>
@@ -118,6 +134,14 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
             </div>
           </div>
           <div className="input-group">
+            <div className="input-label">{t('shoots.expenses')}</div>
+            <input type="number" step="0.01" value={form.expenses} onChange={e => setForm(p => ({ ...p, expenses: e.target.value }))} placeholder="0" />
+          </div>
+          <div className="input-group">
+            <div className="input-label">{t('shoots.sourceSite')}</div>
+            <input value={form.source_site} onChange={e => setForm(p => ({ ...p, source_site: e.target.value }))} />
+          </div>
+          <div className="input-group">
             <div className="input-label">{t('shoots.status')}</div>
             <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
               {STATUSES.map(s => <option key={s} value={s}>{t(`shoots.statusLabels.${s}`)}</option>)}
@@ -126,6 +150,26 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
           <div className="input-group">
             <div className="input-label">{t('shoots.notes')}</div>
             <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={3} />
+          </div>
+          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>{t('shoots.serviceSection')}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div className="input-group" style={{ flex: 1 }}>
+              <div className="input-label">{t('shoots.serviceAmount')}</div>
+              <input type="number" step="0.01" value={form.service_amount} onChange={e => setForm(p => ({ ...p, service_amount: e.target.value }))} placeholder="0" />
+            </div>
+            <div className="input-group" style={{ width: 80 }}>
+              <div className="input-label">{t('shoots.currency')}</div>
+              <select value={form.service_currency} onChange={e => setForm(p => ({ ...p, service_currency: e.target.value }))}>
+                <option value="">—</option>
+                <option value="€">EUR</option>
+                <option value="$">USD</option>
+                <option value="PLN">PLN</option>
+              </select>
+            </div>
+          </div>
+          <div className="input-group">
+            <div className="input-label">{t('shoots.paymentMethod')}</div>
+            <input value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))} placeholder="Revolut / PayPal / Mono" />
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -149,10 +193,13 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
 
           {/* Shoot info */}
           {[
-            shoot.location && { label: t('shoots.location'), value: shoot.location },
-            shoot.shoot_time && { label: t('shoots.startTime'), value: shoot.shoot_time.slice(0, 5) },
+            shoot.city         && { label: t('shoots.city'),      value: shoot.city },
+            shoot.location     && { label: t('shoots.location'),  value: shoot.location },
+            shoot.shoot_time   && { label: t('shoots.startTime'), value: shoot.shoot_time.slice(0, 5) },
             shoot.duration_hours && { label: t('shoots.duration'), value: `${shoot.duration_hours} ${t('shoots.hours')}` },
-            shoot.rate     && { label: t('shoots.rate'),     value: `${shoot.rate} ${shoot.currency}`, bold: true },
+            shoot.rate         && { label: t('shoots.rate'),      value: `${shoot.rate} ${shoot.currency}`, bold: true },
+            shoot.expenses     && { label: t('shoots.expenses'),  value: `${shoot.expenses} €` },
+            shoot.source_site  && { label: t('shoots.sourceSite'), value: shoot.source_site },
             shoot.photographer_site && { label: t('shoots.venue'), value: shoot.photographer_site },
           ].filter(Boolean).map(row => (
             <div key={row.label} className="detail-row">
@@ -160,6 +207,37 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
               <span style={{ fontSize: 14, fontWeight: row.bold ? 600 : 400 }}>{row.value}</span>
             </div>
           ))}
+
+          {shoot.shoot_style && (
+            <div style={{ fontSize: 13, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 10, padding: '8px 12px', marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--text3)', display: 'block', marginBottom: 2 }}>{t('shoots.shootStyle')}</span>
+              {shoot.shoot_style}
+            </div>
+          )}
+
+          {(shoot.service_amount || shoot.payment_method) && (
+            <>
+              <div className="list-section-title" style={{ margin: '12px 0 4px' }}>{t('shoots.serviceSection')}</div>
+              {shoot.service_amount && (
+                <div className="detail-row">
+                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>{t('shoots.serviceAmount')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{shoot.service_amount} {shoot.service_currency || ''}</span>
+                </div>
+              )}
+              {shoot.payment_method && (
+                <div className="detail-row">
+                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>{t('shoots.paymentMethod')}</span>
+                  <span style={{ fontSize: 14 }}>{shoot.payment_method}</span>
+                </div>
+              )}
+              {shoot.service_status && (
+                <div className="detail-row">
+                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>{t('shoots.serviceStatus')}</span>
+                  <span style={{ fontSize: 14 }}>{shoot.service_status}</span>
+                </div>
+              )}
+            </>
+          )}
 
           {/* Photographer contacts */}
           {(shoot.photographer_email || shoot.photographer_phone || shoot.photographer_telegram || shoot.dialog_url) && (

@@ -72,8 +72,9 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
   try {
     const fields = ['photographer_name','photographer_site','dialog_url','shoot_date',
                     'shoot_time','duration_hours',
-                    'location','rate','currency','status','notes',
-                    'photographer_email','photographer_phone','photographer_telegram'];
+                    'city','location','shoot_style','rate','currency','status','notes','expenses','source_site',
+                    'photographer_email','photographer_phone','photographer_telegram',
+                    'service_amount','service_currency','service_status','payment_method'];
     const updates = [];
     const vals = [];
     let i = 1;
