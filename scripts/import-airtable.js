@@ -108,7 +108,7 @@ async function processBase(pool, { modelId, baseId, name }) {
   try {
     const sitesRaw = await atGetAll(baseId, TABLE_SITES);
     for (const r of sitesRaw) {
-      const siteName = r.fields['Name'] || r.fields['Название'] || r.fields['Сайт'] || null;
+      const siteName = r.fields['Источник'] || r.fields['Name'] || r.fields['Название'] || r.fields['Сайт'] || null;
       if (siteName) siteMap[r.id] = siteName;
     }
     console.log(`  Sites: ${sitesRaw.length}`);
@@ -226,10 +226,13 @@ async function processBase(pool, { modelId, baseId, name }) {
         service_currency = COALESCE($19, service_currency),
         service_status   = COALESCE($20, service_status),
         payment_method   = COALESCE($21, payment_method)
-      WHERE model_id = $22 AND airtable_id IS NULL
-        AND photographer_name ILIKE $23
-        AND ($24::date IS NULL OR shoot_date = $24::date)
-      LIMIT 1
+      WHERE id = (
+        SELECT id FROM shoots
+        WHERE model_id = $22 AND airtable_id IS NULL
+          AND photographer_name ILIKE $23
+          AND ($24::date IS NULL OR shoot_date = $24::date)
+        LIMIT 1
+      )
     `, [airtableId, ...updateFields, modelId, phName, shootDate]);
 
     if (byName > 0) { updated++; continue; }
