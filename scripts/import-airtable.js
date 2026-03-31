@@ -88,19 +88,19 @@ async function processBase(pool, { modelId, baseId, name }) {
   for (const r of phRaw) {
     const f = r.fields;
     const name    = (f['Name'] || '').trim();
-    const phone   = f['Phone'] || null;
-    const email   = f['Email'] || null;
-    const social  = f['Соц сеть/'] || null;
-    const siteArr = f['Сайт'] || [];
+    const phone      = f['Phone'] || null;
+    const email      = f['Email'] || null;
+    const profileUrl = f['Соц сеть/'] || null;  // URL профиля на сайте
+    const siteArr    = f['Сайт'] || [];
 
-    const telegram = extractTelegram(phone) || extractTelegram(social);
+    const telegram = extractTelegram(phone) || extractTelegram(profileUrl);
     let site = null;
     if (siteArr.length > 0) {
       const sn = siteArr[0].name || '';
       site = siteFromUrl(sn) || (sn.length < 40 ? sn : null);
     }
     const displayName = name.startsWith('http') ? (siteFromUrl(name) || name) : name;
-    phMap[r.id] = { name: displayName, phone, email, telegram, site };
+    phMap[r.id] = { name: displayName, phone, email, telegram, site, profileUrl };
   }
 
   // Fetch sites table for "Источник" resolution
@@ -163,70 +163,97 @@ async function processBase(pool, { modelId, baseId, name }) {
 
     if (!phName || phName.length < 2) { skipped++; continue; }
 
-    // Try to find existing shoot by airtable_id first, then by name+date
-    const { rows: existing } = await pool.query(
-      'SELECT id FROM shoots WHERE airtable_id = $1 OR (model_id = $2 AND airtable_id IS NULL AND photographer_name ILIKE $3 AND ($4::date IS NULL OR shoot_date = $4::date)) LIMIT 1',
-      [airtableId, modelId, phName, shootDate]
-    );
+    const updateFields = [
+      status,
+      rate, shootDate, shootTime, durationHours,
+      location?.slice(0, 300), city?.slice(0, 200),
+      notes?.slice(0, 2000),
+      ph?.email, ph?.phone, ph?.telegram, ph?.site, ph?.profileUrl,
+      shootStyle?.slice(0, 500),
+      expenses, sourceSite,
+      serviceAmount, serviceCurrency, serviceStatus, paymentMethod,
+    ];
 
-    if (existing.length > 0) {
-      await pool.query(`
-        UPDATE shoots SET
-          airtable_id          = COALESCE(airtable_id, $1),
-          status               = $2,
-          rate                 = COALESCE($3::numeric, rate),
-          shoot_date           = COALESCE($4::date, shoot_date),
-          shoot_time           = COALESCE($5::time, shoot_time),
-          duration_hours       = COALESCE($6::numeric, duration_hours),
-          location             = COALESCE($7, location),
-          city                 = COALESCE($8, city),
-          notes                = COALESCE($9, notes),
-          photographer_email   = COALESCE($10, photographer_email),
-          photographer_phone   = COALESCE($11, photographer_phone),
-          photographer_telegram = COALESCE($12, photographer_telegram),
-          photographer_site    = COALESCE($13, photographer_site),
-          shoot_style          = COALESCE($14, shoot_style),
-          expenses             = COALESCE($15::numeric, expenses),
-          source_site          = COALESCE($16, source_site),
-          service_amount       = COALESCE($17::numeric, service_amount),
-          service_currency     = COALESCE($18, service_currency),
-          service_status       = COALESCE($19, service_status),
-          payment_method       = COALESCE($20, payment_method)
-        WHERE id = $21
-      `, [
-        airtableId, status,
-        rate, shootDate, shootTime, durationHours,
-        location?.slice(0, 300), city?.slice(0, 200),
-        notes?.slice(0, 2000),
-        ph?.email, ph?.phone, ph?.telegram, ph?.site,
-        shootStyle?.slice(0, 500),
-        expenses, sourceSite,
-        serviceAmount, serviceCurrency, serviceStatus, paymentMethod,
-        existing[0].id,
-      ]);
-      updated++;
-    } else {
-      await pool.query(`
-        INSERT INTO shoots
-          (model_id, airtable_id, photographer_name, photographer_site,
-           photographer_email, photographer_phone, photographer_telegram,
-           shoot_date, shoot_time, duration_hours,
-           location, city, rate, currency, status, notes,
-           shoot_style, expenses, source_site,
-           service_amount, service_currency, service_status, payment_method)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'EUR',$14,$15,$16,$17,$18,$19,$20,$21,$22)
-        ON CONFLICT DO NOTHING
-      `, [
-        modelId, airtableId, phName, ph?.site,
-        ph?.email, ph?.phone, ph?.telegram,
-        shootDate, shootTime, durationHours,
-        location?.slice(0, 300), city?.slice(0, 200),
-        rate, status, notes?.slice(0, 2000),
-        shootStyle?.slice(0, 500), expenses, sourceSite,
-        serviceAmount, serviceCurrency, serviceStatus, paymentMethod,
-      ]);
-      inserted++;
-    }
+    // 1. Update by airtable_id
+    const { rowCount: byAt } = await pool.query(`
+      UPDATE shoots SET
+        status               = $1,
+        rate                 = COALESCE($2::numeric, rate),
+        shoot_date           = COALESCE($3::date, shoot_date),
+        shoot_time           = COALESCE($4::time, shoot_time),
+        duration_hours       = COALESCE($5::numeric, duration_hours),
+        location             = COALESCE($6, location),
+        city                 = COALESCE($7, city),
+        notes                = COALESCE($8, notes),
+        photographer_email       = COALESCE($9, photographer_email),
+        photographer_phone       = COALESCE($10, photographer_phone),
+        photographer_telegram    = COALESCE($11, photographer_telegram),
+        photographer_site        = COALESCE($12, photographer_site),
+        photographer_profile_url = COALESCE($13, photographer_profile_url),
+        shoot_style   = COALESCE($14, shoot_style),
+        expenses      = COALESCE($15::numeric, expenses),
+        source_site   = COALESCE($16, source_site),
+        service_amount   = COALESCE($17::numeric, service_amount),
+        service_currency = COALESCE($18, service_currency),
+        service_status   = COALESCE($19, service_status),
+        payment_method   = COALESCE($20, payment_method)
+      WHERE airtable_id = $21
+    `, [...updateFields, airtableId]);
+
+    if (byAt > 0) { updated++; continue; }
+
+    // 2. Update by name+date (no airtable_id yet) — also set airtable_id
+    const { rowCount: byName } = await pool.query(`
+      UPDATE shoots SET
+        airtable_id          = $1,
+        status               = $2,
+        rate                 = COALESCE($3::numeric, rate),
+        shoot_date           = COALESCE($4::date, shoot_date),
+        shoot_time           = COALESCE($5::time, shoot_time),
+        duration_hours       = COALESCE($6::numeric, duration_hours),
+        location             = COALESCE($7, location),
+        city                 = COALESCE($8, city),
+        notes                = COALESCE($9, notes),
+        photographer_email       = COALESCE($10, photographer_email),
+        photographer_phone       = COALESCE($11, photographer_phone),
+        photographer_telegram    = COALESCE($12, photographer_telegram),
+        photographer_site        = COALESCE($13, photographer_site),
+        photographer_profile_url = COALESCE($14, photographer_profile_url),
+        shoot_style   = COALESCE($15, shoot_style),
+        expenses      = COALESCE($16::numeric, expenses),
+        source_site   = COALESCE($17, source_site),
+        service_amount   = COALESCE($18::numeric, service_amount),
+        service_currency = COALESCE($19, service_currency),
+        service_status   = COALESCE($20, service_status),
+        payment_method   = COALESCE($21, payment_method)
+      WHERE model_id = $22 AND airtable_id IS NULL
+        AND photographer_name ILIKE $23
+        AND ($24::date IS NULL OR shoot_date = $24::date)
+      LIMIT 1
+    `, [airtableId, ...updateFields, modelId, phName, shootDate]);
+
+    if (byName > 0) { updated++; continue; }
+
+    // 3. Insert new
+    await pool.query(`
+      INSERT INTO shoots
+        (model_id, airtable_id, photographer_name, photographer_site, photographer_profile_url,
+         photographer_email, photographer_phone, photographer_telegram,
+         shoot_date, shoot_time, duration_hours,
+         location, city, rate, currency, status, notes,
+         shoot_style, expenses, source_site,
+         service_amount, service_currency, service_status, payment_method)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'EUR',$15,$16,$17,$18,$19,$20,$21,$22,$23)
+    `, [
+      modelId, airtableId, phName, ph?.site, ph?.profileUrl,
+      ph?.email, ph?.phone, ph?.telegram,
+      shootDate, shootTime, durationHours,
+      location?.slice(0, 300), city?.slice(0, 200),
+      rate, status, notes?.slice(0, 2000),
+      shootStyle?.slice(0, 500), expenses, sourceSite,
+      serviceAmount, serviceCurrency, serviceStatus, paymentMethod,
+    ]);
+    inserted++;
   }
 
   console.log(`  → Updated: ${updated}  Inserted: ${inserted}  Skipped: ${skipped}`);

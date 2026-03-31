@@ -20,6 +20,7 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
       photographer_email: shoot.photographer_email || '',
       photographer_phone: shoot.photographer_phone || '',
       photographer_telegram: shoot.photographer_telegram || '',
+      photographer_profile_url: shoot.photographer_profile_url || '',
       dialog_url: shoot.dialog_url || '',
       shoot_date: shoot.shoot_date ? shoot.shoot_date.slice(0, 10) : '',
       shoot_time: shoot.shoot_time ? shoot.shoot_time.slice(0, 5) : '',
@@ -77,8 +78,9 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
             { key: 'photographer_site',     label: t('shoots.site'),    ph: 'purpleport / modelmayhem' },
             { key: 'photographer_email',    label: 'Email',             ph: 'email@example.com', type: 'email' },
             { key: 'photographer_phone',    label: t('shoots.phone'),   ph: '+49 ...', type: 'tel' },
-            { key: 'photographer_telegram', label: 'Telegram',          ph: '@username' },
-            { key: 'dialog_url',            label: t('shoots.dialog'),  ph: 'https://...' },
+            { key: 'photographer_telegram',    label: 'Telegram',               ph: '@username' },
+            { key: 'photographer_profile_url', label: t('shoots.profileUrl'),   ph: 'https://purpleport.com/...' },
+            { key: 'dialog_url',               label: t('shoots.dialog'),       ph: 'https://...' },
           ].map(f => (
             <div className="input-group" key={f.key}>
               <div className="input-label">{f.label}</div>
@@ -240,7 +242,7 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
           )}
 
           {/* Photographer contacts */}
-          {(shoot.photographer_email || shoot.photographer_phone || shoot.photographer_telegram || shoot.dialog_url) && (
+          {(shoot.photographer_email || shoot.photographer_phone || shoot.photographer_telegram || shoot.photographer_profile_url || shoot.dialog_url) && (
             <>
               <div className="list-section-title" style={{ margin: '12px 0 4px' }}>{t('shoots.photographerContacts')}</div>
               {shoot.photographer_email && (
@@ -264,6 +266,14 @@ export default function ShootSheet({ shoot, onClose, canEdit, onShootUpdated }) 
                   <span style={{ color: 'var(--text3)', fontSize: 13 }}>Telegram</span>
                   <a href={`https://t.me/${tgHandle}`} target="_blank" rel="noreferrer" style={{ fontSize: 14, color: 'var(--accent)' }}>
                     @{tgHandle}
+                  </a>
+                </div>
+              )}
+              {shoot.photographer_profile_url && (
+                <div className="detail-row">
+                  <span style={{ color: 'var(--text3)', fontSize: 13 }}>{t('shoots.profileUrl')}</span>
+                  <a href={shoot.photographer_profile_url} target="_blank" rel="noreferrer" style={{ fontSize: 14, color: 'var(--accent)' }}>
+                    {t('shoots.open')}
                   </a>
                 </div>
               )}

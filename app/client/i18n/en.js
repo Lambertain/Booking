@@ -75,6 +75,7 @@ export default {
     serviceAmount: 'Service amount',
     serviceStatus: 'Service status',
     paymentMethod: 'Payment method',
+    profileUrl: 'Profile',
     photographerContacts: 'Photographer contacts',
     changeStatus: 'Change status',
     open: 'Open',

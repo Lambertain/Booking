@@ -75,6 +75,7 @@ export default {
     serviceAmount: 'Сумма сервиса',
     serviceStatus: 'Статус сервиса',
     paymentMethod: 'Способ оплаты',
+    profileUrl: 'Профиль',
     photographerContacts: 'Контакты фотографа',
     changeStatus: 'Сменить статус',
     open: 'Открыть',
