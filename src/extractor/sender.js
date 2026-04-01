@@ -152,39 +152,74 @@ async function sendPurplePortReply(profileId, siteConfig, url, message) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(5000);
 
+    // Check login — PurplePort redirects to /login if session expired
+    const currentUrl = page.url();
+    console.log(`[sender] PurplePort page URL: ${currentUrl}`);
+    if (currentUrl.includes('/login') || currentUrl.includes('/signin')) {
+      throw new Error(`Сесія PurplePort закінчилась — потрібно перелогінитись (${currentUrl})`);
+    }
+
     // PurplePort uses TinyMCE editor
     const formExists = await page.locator('form#message').count();
-    if (!formExists) throw new Error('Reply form #message not found on page');
+    if (!formExists) {
+      const pageTitle = await page.title().catch(() => '');
+      const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 300) || '').catch(() => '');
+      throw new Error(`Reply form #message not found. Title: "${pageTitle}". Page: ${bodyText.replace(/\n/g, ' ')}`);
+    }
 
     // Set content via TinyMCE API
     const editorSet = await page.evaluate((msg) => {
       if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
-        const html = msg.split('\n').map(l => `<p>${l}</p>`).join('');
+        const html = msg.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
         tinymce.activeEditor.setContent(html);
-        return true;
+        return { ok: true, method: 'tinymce' };
       }
       // Fallback: fill textarea directly
       const ta = document.querySelector('textarea#content');
       if (ta) {
         ta.value = msg;
         ta.dispatchEvent(new Event('input', { bubbles: true }));
-        return true;
+        return { ok: true, method: 'textarea' };
       }
-      return false;
+      return { ok: false, method: null };
     }, message);
 
-    if (!editorSet) throw new Error('Could not set message content (TinyMCE or textarea)');
+    if (!editorSet.ok) throw new Error('Could not set message content (TinyMCE or textarea not found)');
+    console.log(`[sender] PurplePort editor set via ${editorSet.method}`);
     await page.waitForTimeout(1000);
 
-    // Submit the form
+    // Submit the form — wait for navigation (form submit = redirect on success)
+    const navigationPromise = page.waitForNavigation({ timeout: 15000 }).catch(() => null);
     await page.evaluate(() => {
-      // Sync TinyMCE to textarea before submit
       if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
         tinymce.activeEditor.save();
       }
       document.querySelector('form#message').submit();
     });
-    await page.waitForTimeout(6000);
+    await navigationPromise;
+    await page.waitForTimeout(2000);
+
+    // Verify result: check final URL and page state
+    const finalUrl = page.url();
+    console.log(`[sender] PurplePort after submit URL: ${finalUrl}`);
+
+    if (finalUrl.includes('/login') || finalUrl.includes('/signin')) {
+      throw new Error(`Сесія PurplePort закінчилась під час відправки — потрібно перелогінитись`);
+    }
+
+    // If form is still present on page — submission likely failed
+    const formStillPresent = await page.locator('form#message').count();
+    if (formStillPresent) {
+      const errorText = await page.evaluate(() => {
+        const selectors = ['.error', '.alert-danger', '.flash-error', '.message.error', 'p.error'];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return null;
+      });
+      throw new Error(`Форма відповіді досі на сторінці після submit${errorText ? ` — помилка: ${errorText}` : ' — можливо CSRF або валідація'}`);
+    }
 
     return { ok: true, url };
   } finally {
