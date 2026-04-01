@@ -199,7 +199,7 @@ export default function App() {
       )}
 
       {/* Main scrollable content */}
-      <div className="screen" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="screen" style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
         {renderScreen()}
       </div>
 
