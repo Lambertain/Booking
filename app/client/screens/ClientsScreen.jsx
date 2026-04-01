@@ -559,7 +559,7 @@ export default function ClientsScreen({ user }) {
                     <button
                       onClick={() => setEditNamesSheet(true)}
                       style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, cursor: 'pointer', padding: 0 }}
-                    >✏️ Редагувати</button>
+                    >✏️ {t('edit')}</button>
                   )}
                 </div>
                 {templateNameMode === 'select' ? (
@@ -578,7 +578,7 @@ export default function ClientsScreen({ user }) {
                     {existingNames.map(n => (
                       <option key={n} value={n}>{n}</option>
                     ))}
-                    <option value="__custom__">+ Нова назва...</option>
+                    <option value="__custom__">{t('templates.newNamePh')}</option>
                   </select>
                 ) : (
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -632,7 +632,7 @@ export default function ClientsScreen({ user }) {
       />
 
       {/* Edit template names sheet */}
-      <Sheet open={editNamesSheet} onClose={() => { setEditNamesSheet(false); setEditingName({ old: '', new: '' }); }} title="Назви шаблонів">
+      <Sheet open={editNamesSheet} onClose={() => { setEditNamesSheet(false); setEditingName({ old: '', new: '' }); }} title={t('templates.editNames')}>
         {(() => {
           const existingNames = [...new Set(
             templates.map(tpl => (tpl.name || '').replace(/^Шаблон\s*/i, '').trim()).filter(Boolean)
@@ -667,7 +667,7 @@ export default function ClientsScreen({ user }) {
                       <>
                         <span style={{ flex: 1, fontSize: 14 }}>{n}</span>
                         <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 8 }}>
-                          {templates.filter(t => (t.name || '').replace(/^Шаблон\s*/i, '').trim() === n).length} шт.
+                          {templates.filter(tpl => (tpl.name || '').replace(/^Шаблон\s*/i, '').trim() === n).length} {t('templates.count')}
                         </span>
                         <button onClick={() => setEditingName({ old: n, new: n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 16 }}>✏️</button>
                       </>

@@ -76,7 +76,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
   }
 
   async function deleteUser(u) {
-    if (!confirm(`Удалить ${u.name}?`)) return;
+    if (!confirm(t('users.confirmDelete', { name: u.name }))) return;
     await api.delete(`/api/users/${u.id}`);
     setUsers(list => list.filter(x => x.id !== u.id));
   }
@@ -141,7 +141,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
           ) : (
             <div className="card">
               {filteredUsers.length === 0 && (
-                <div className="list-item" style={{ color: 'var(--text3)', fontSize: 13, justifyContent: 'center' }}>Нет пользователей</div>
+                <div className="list-item" style={{ color: 'var(--text3)', fontSize: 13, justifyContent: 'center' }}>{t('users.noUsers')}</div>
               )}
               {filteredUsers.map(u => (
                 <div key={u.id} className="list-item">

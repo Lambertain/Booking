@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../api.js';
+import { useLang } from '../i18n/useLang.js';
 
 export default function TagManagerSheet({ open, onClose, tags, onTagsChanged }) {
+  const { t } = useLang();
   const [renaming, setRenaming] = useState(null); // { oldName, newName }
   const [saving, setSaving] = useState(false);
   const [newTagName, setNewTagName] = useState('');
@@ -26,7 +28,7 @@ export default function TagManagerSheet({ open, onClose, tags, onTagsChanged }) 
   }
 
   async function deleteTag(name) {
-    if (!confirm(`Видалити тег "${name}" у всіх підписників?`)) return;
+    if (!confirm(t('tags.confirmDelete', { name }))) return;
     setSaving(true);
     try {
       await api.delete(`/api/broadcast/tag/${encodeURIComponent(name)}`);
@@ -37,9 +39,9 @@ export default function TagManagerSheet({ open, onClose, tags, onTagsChanged }) 
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="🏷️ Управління тегами">
+    <Sheet open={open} onClose={onClose} title={t('tags.title')}>
       <div style={{ marginBottom: 4, fontSize: 13, color: 'var(--text3)' }}>
-        {tags.length} тегів • зміни застосовуються до всіх підписників
+        {t('tags.summary', { count: tags.length })}
       </div>
 
       <div style={{ marginBottom: 14, display: 'flex', gap: 6 }}>
@@ -47,20 +49,18 @@ export default function TagManagerSheet({ open, onClose, tags, onTagsChanged }) 
           value={newTagName}
           onChange={e => setNewTagName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && newTagName.trim() && setRenaming({ oldName: '', newName: newTagName.trim() })}
-          placeholder="Назва нового тегу..."
+          placeholder={t('tags.newTagPh')}
           style={{ flex: 1 }}
         />
         <button
           className="btn btn-secondary"
           disabled={!newTagName.trim()}
           onClick={() => {
-            // "New tag" just copies to clipboard or shows as reminder —
-            // actual tag creation happens when assigning to a subscriber
-            alert(`Тег "${newTagName.trim()}" можна призначити підписнику через редагування контакту`);
+            alert(t('tags.assignHint', { name: newTagName.trim() }));
             setNewTagName('');
           }}
         >
-          + Новий
+          {t('tags.newBtn')}
         </button>
       </div>
 
@@ -113,14 +113,14 @@ export default function TagManagerSheet({ open, onClose, tags, onTagsChanged }) 
                 <button
                   onClick={() => setRenaming({ oldName: tag, newName: tag })}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text3)', padding: '0 4px' }}
-                  title="Перейменувати"
+                  title={t('tags.rename')}
                 >
                   ✏️
                 </button>
                 <button
                   onClick={() => deleteTag(tag)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--red)', padding: '0 4px' }}
-                  title="Видалити тег"
+                  title={t('tags.deleteTitle')}
                   disabled={saving}
                 >
                   🗑️

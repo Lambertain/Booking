@@ -4,13 +4,11 @@ import LangSwitcher from '../i18n/LangSwitcher.jsx';
 
 export default function LoginPage() {
   const { t } = useLang();
-  const [status, setStatus] = useState('Відкрийте цю сторінку через Telegram');
+  const [status, setStatus] = useState(null);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (tg?.initData) {
-      setStatus('Авторизація через Telegram...');
-    }
+    setStatus(tg?.initData ? t('auth.telegramAuth') : t('auth.telegramHint'));
   }, []);
 
   return (
@@ -20,7 +18,7 @@ export default function LoginPage() {
         <div style={{ fontSize: 48, marginBottom: 16 }}>✈️</div>
         <div style={{ color: 'var(--text2)', lineHeight: 1.6 }}>{status}</div>
         <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text2)' }}>
-          Якщо ви не зареєстровані — зверніться до адміністратора
+          {t('auth.notRegistered')}
         </div>
       </div>
       <LangSwitcher />

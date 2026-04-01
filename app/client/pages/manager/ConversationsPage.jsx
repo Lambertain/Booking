@@ -4,6 +4,7 @@ import { useLang } from '../../i18n/useLang.js';
 import Sheet from '../../components/Sheet.jsx';
 
 function BroadcastPanel({ onClose }) {
+  const { t } = useLang();
   const [tags, setTags] = useState([]);
   const [allTotal, setAllTotal] = useState(0);
   const [selectedTags, setSelectedTags] = useState([]);
@@ -28,7 +29,7 @@ function BroadcastPanel({ onClose }) {
 
   function toggleTag(tag) {
     setSelectedTags(prev => {
-      const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag];
+      const next = prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag];
       updateCount(next);
       return next;
     });
@@ -39,7 +40,7 @@ function BroadcastPanel({ onClose }) {
     setSending(true);
     try {
       const d = await api.post('/api/broadcast', { text: text.trim(), tags: selectedTags });
-      setResult(`✅ Відправляється ${d.count} повідомлень`);
+      setResult(t('broadcast.sentResult', { count: d.count }));
       setText('');
     } catch (err) {
       setResult(`❌ ${err.message}`);
@@ -51,10 +52,10 @@ function BroadcastPanel({ onClose }) {
   return (
     <div style={{ padding: 16, borderLeft: '1px solid var(--border)', width: 320, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontWeight: 600 }}>📣 Розсилка</div>
+        <div style={{ fontWeight: 600 }}>{t('broadcast.title')}</div>
         <button className="btn-ghost" style={{ fontSize: 18 }} onClick={onClose}>×</button>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Теги:</div>
+      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{t('broadcast.tagsHint')}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
         {tags.map(({ tag, count: tc }) => (
           <button key={tag} onClick={() => toggleTag(tag)}
@@ -66,18 +67,18 @@ function BroadcastPanel({ onClose }) {
         ))}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
-        Отримувачів: <b style={{ color: 'var(--text1)' }}>{count}</b> / {allTotal}
+        {t('broadcast.recipients')} <b style={{ color: 'var(--text1)' }}>{count}</b> {t('broadcast.ofActive', { total: allTotal })}
       </div>
       <textarea
         value={text}
         onChange={e => setText(e.target.value)}
         rows={5}
-        placeholder="Текст повідомлення..."
+        placeholder={t('broadcast.messagePh')}
         style={{ width: '100%', resize: 'vertical', marginBottom: 8, padding: 8, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text1)', fontSize: 13, boxSizing: 'border-box' }}
       />
       {result && <div style={{ fontSize: 12, marginBottom: 8, color: result.startsWith('✅') ? 'var(--green)' : 'var(--red)' }}>{result}</div>}
       <button className="btn-primary" style={{ width: '100%' }} onClick={send} disabled={!text.trim() || sending}>
-        {sending ? 'Відправка...' : `Надіслати (${count})`}
+        {sending ? t('broadcast.sending') : t('broadcast.send', { count })}
       </button>
     </div>
   );
@@ -142,7 +143,7 @@ export default function ConversationsPage({ user }) {
       <div style={{ width: 260, borderRight: '1px solid var(--border)', overflowY: 'auto' }}>
         <div style={{ padding: '12px 16px', fontWeight: 600, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {t('conversations.title')}
-          <button onClick={() => setBroadcastOpen(v => !v)} title="Розсилка"
+          <button onClick={() => setBroadcastOpen(v => !v)} title={t('broadcast.tooltip')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0 }}>📣</button>
         </div>
         {convs.map(c => (
@@ -154,7 +155,7 @@ export default function ConversationsPage({ user }) {
                }}>
             <div style={{ fontWeight: 500 }}>
               {convLabel(c)}
-              {convBotBlocked(c) && <span title="Заблокував бота" style={{ marginLeft: 4, fontSize: 12 }}>🚫</span>}
+              {convBotBlocked(c) && <span title={t('users.botBlocked')} style={{ marginLeft: 4, fontSize: 12 }}>🚫</span>}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {c.last_message || t('conversations.noMessages')}

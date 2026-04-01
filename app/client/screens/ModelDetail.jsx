@@ -152,7 +152,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
   }
   function removeTour(i) {
     if (isOwner) return; // models cannot delete tours
-    if (!confirm('Удалить этот тур?')) return;
+    if (!confirm(t('models.deleteTour'))) return;
     setTours(t => t.filter((_, idx) => idx !== i));
   }
 
@@ -211,7 +211,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
         {/* Upcoming tours */}
         {upcomingTours.length > 0 && (
           <div style={{ padding: '0 16px 8px' }}>
-            <div className="list-section-title" style={{ marginBottom: 4 }}>Туры</div>
+            <div className="list-section-title" style={{ marginBottom: 4 }}>{t('models.tours')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {upcomingTours.map((tour, i) => (
                 <span key={i} style={{
@@ -244,7 +244,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
           return (
             <div style={{ padding: '0 16px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <button className="btn btn-secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTourSheet(true)}>
-                + Тур
+                + {t('models.addTour')}
               </button>
               {showWarning && (
                 <span style={{
@@ -252,7 +252,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
                   fontSize: 11, color: 'var(--red)', fontWeight: 600,
                   background: 'rgba(255,69,58,0.12)', borderRadius: 20, padding: '3px 8px',
                 }}>
-                  ● {nearestEndingSoon && hasPlannedTour ? 'Тур скоро начинается — запланируй следующий' : 'Нет тура на след. месяц'}
+                  ● {nearestEndingSoon && hasPlannedTour ? t('models.tourWarning') : t('models.noTourWarning')}
                 </span>
               )}
             </div>
@@ -269,7 +269,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
               {t('shoots.list')}
             </button>
             <button className={`segmented-btn ${tab === 'profile' ? 'active' : ''}`} onClick={() => setTab('profile')}>
-              Профиль
+              {t('models.profile')}
             </button>
           </div>
         </div>
@@ -304,15 +304,15 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
 
 
       {/* ── Edit profile sheet ── */}
-      <Sheet open={editSheet} onClose={() => setEditSheet(false)} title="Редактировать профиль">
+      <Sheet open={editSheet} onClose={() => setEditSheet(false)} title={t('models.editProfile')}>
         <div style={{ overflowY: 'auto', maxHeight: '72vh', display: 'flex', flexDirection: 'column', gap: 0 }}>
           {/* Basic */}
-          <div className="list-section-title" style={{ marginBottom: 6 }}>Основное</div>
+          <div className="list-section-title" style={{ marginBottom: 6 }}>{t('models.basicInfo')}</div>
           {[
-            { key: 'display_name', label: 'Имя' },
-            { key: 'city',         label: 'Город',     ph: 'Hamburg' },
-            { key: 'instagram',    label: 'Instagram',  ph: 'username без @' },
-            { key: 'rates',        label: 'Расценки',   ph: 'Portrait 80€, Nude 100€/h' },
+            { key: 'display_name', label: t('users.name') },
+            { key: 'city',         label: t('shoots.city'),     ph: 'Hamburg' },
+            { key: 'instagram',    label: 'Instagram',  ph: t('models.instagramPh') },
+            { key: 'rates',        label: t('shoots.rate'),   ph: 'Portrait 80€, Nude 100€/h' },
           ].map(f => (
             <div className="input-group" key={f.key}>
               <div className="input-label">{f.label}</div>
@@ -321,7 +321,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
           ))}
 
           {/* Sites — checkboxes only, no price */}
-          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Сайты</div>
+          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>{t('models.sites')}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
             {sitesList.map(s => (
               <button
@@ -339,12 +339,12 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
             ))}
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-            <input value={customSite} onChange={e => setCustomSite(e.target.value)} placeholder="Добавить сайт..." style={{ flex: 1 }} />
+            <input value={customSite} onChange={e => setCustomSite(e.target.value)} placeholder={t('models.addSite')} style={{ flex: 1 }} />
             <button className="btn btn-secondary" style={{ flexShrink: 0 }} onClick={addCustomSite}>+</button>
           </div>
 
           {/* Styles — toggle + price per style */}
-          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Стили и цены</div>
+          <div className="list-section-title" style={{ margin: '12px 0 6px' }}>{t('models.stylesAndPrices')}</div>
           {[...STYLES, ...[...selectedStyles].filter(s => !STYLES.includes(s))].map(s => (
             <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <button
@@ -370,7 +370,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
             </div>
           ))}
           <div style={{ display: 'flex', gap: 6 }}>
-            <input value={customStyle} onChange={e => setCustomStyle(e.target.value)} placeholder="Добавить стиль..." style={{ flex: 1 }} />
+            <input value={customStyle} onChange={e => setCustomStyle(e.target.value)} placeholder={t('models.addStyle')} style={{ flex: 1 }} />
             <button className="btn btn-secondary" style={{ flexShrink: 0 }} onClick={addCustomStyle}>+</button>
           </div>
         </div>
@@ -381,20 +381,20 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
       </Sheet>
 
       {/* Add tour sheet */}
-      <Sheet open={tourSheet} onClose={() => setTourSheet(false)} title="Добавить тур">
+      <Sheet open={tourSheet} onClose={() => setTourSheet(false)} title={t('models.addTour')}>
         <div className="input-group">
-          <div className="input-label">Город</div>
-          <input value={newTour.city} onChange={e => setNewTour(t => ({ ...t, city: e.target.value }))} placeholder="Paris" />
+          <div className="input-label">{t('models.tourCity')}</div>
+          <input value={newTour.city} onChange={e => setNewTour(tr => ({ ...tr, city: e.target.value }))} placeholder="Paris" />
         </div>
         <div className="input-group">
-          <div className="input-label">С</div>
-          <input type="date" value={newTour.date_from} onChange={e => setNewTour(t => ({ ...t, date_from: e.target.value }))} />
+          <div className="input-label">{t('models.tourFrom')}</div>
+          <input type="date" value={newTour.date_from} onChange={e => setNewTour(tr => ({ ...tr, date_from: e.target.value }))} />
         </div>
         <div className="input-group">
-          <div className="input-label">По</div>
-          <input type="date" value={newTour.date_to} onChange={e => setNewTour(t => ({ ...t, date_to: e.target.value }))} />
+          <div className="input-label">{t('models.tourTo')}</div>
+          <input type="date" value={newTour.date_to} onChange={e => setNewTour(tr => ({ ...tr, date_to: e.target.value }))} />
         </div>
-        <button className="btn btn-primary btn-full" onClick={addTour}>Добавить</button>
+        <button className="btn btn-primary btn-full" onClick={addTour}>{t('add')}</button>
       </Sheet>
 
       {/* ── Create shoot sheet ── */}
@@ -413,13 +413,13 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
 
 /* ── Profile tab (read-only view) ── */
 function ProfileTab({ sitesList, activeSites, selectedStyles, stylePrices, canEdit, onEditClick }) {
+  const { t } = useLang();
   const stylesList = [...selectedStyles];
 
   return (
     <div style={{ padding: '0 16px 24px' }}>
-      {/* Active sites — names only, no prices */}
       <div className="list-section-title" style={{ marginBottom: 8 }}>
-        Сайты{activeSites.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({activeSites.length})</span>}
+        {t('models.sites')}{activeSites.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({activeSites.length})</span>}
       </div>
       {activeSites.length > 0 ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
@@ -433,12 +433,11 @@ function ProfileTab({ sitesList, activeSites, selectedStyles, stylePrices, canEd
           ))}
         </div>
       ) : (
-        <div style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 16 }}>Сайты не указаны</div>
+        <div style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 16 }}>{t('models.noSites')}</div>
       )}
 
-      {/* Styles with prices */}
       <div className="list-section-title" style={{ marginBottom: 8 }}>
-        Стили{stylesList.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({stylesList.length})</span>}
+        {t('models.stylesAndPrices')}{stylesList.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({stylesList.length})</span>}
       </div>
       {stylesList.length > 0 ? (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -456,12 +455,12 @@ function ProfileTab({ sitesList, activeSites, selectedStyles, stylePrices, canEd
           ))}
         </div>
       ) : (
-        <div style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 16 }}>Стили не указаны</div>
+        <div style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 16 }}>{t('models.noStyles')}</div>
       )}
 
       {canEdit && (
         <button className="btn btn-secondary btn-full" onClick={onEditClick}>
-          Редактировать профиль
+          {t('models.editProfile')}
         </button>
       )}
     </div>
@@ -504,16 +503,16 @@ function CreateShootSheet({ open, onClose, modelId, onCreated }) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Новая съёмка">
+    <Sheet open={open} onClose={onClose} title={t('models.newShoot')}>
       <div style={{ overflowY: 'auto', maxHeight: '72vh', display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <div className="list-section-title" style={{ marginBottom: 6 }}>Фотограф</div>
+        <div className="list-section-title" style={{ marginBottom: 6 }}>{t('models.photographer')}</div>
         {[
-          { key: 'photographer_name',     label: 'Имя *',    ph: 'Имя фотографа' },
-          { key: 'photographer_site',     label: 'Площадка', ph: 'PurplePort / Model-Kartei...' },
-          { key: 'photographer_email',    label: 'Email',    ph: 'email@example.com', type: 'email' },
-          { key: 'photographer_phone',    label: 'Телефон',  ph: '+49 ...',           type: 'tel' },
-          { key: 'photographer_telegram', label: 'Telegram', ph: '@username' },
-          { key: 'dialog_url',            label: 'Диалог',   ph: 'https://...' },
+          { key: 'photographer_name',     label: `${t('shoots.photographer')} *`, ph: t('shoots.photographer') },
+          { key: 'photographer_site',     label: t('shoots.venue'),  ph: 'PurplePort / Model-Kartei...' },
+          { key: 'photographer_email',    label: 'Email',            ph: 'email@example.com', type: 'email' },
+          { key: 'photographer_phone',    label: t('shoots.phone'),  ph: '+49 ...',            type: 'tel' },
+          { key: 'photographer_telegram', label: 'Telegram',         ph: '@username' },
+          { key: 'dialog_url',            label: t('shoots.dialog'), ph: 'https://...' },
         ].map(fi => (
           <div className="input-group" key={fi.key}>
             <div className="input-label">{fi.label}</div>
@@ -522,22 +521,22 @@ function CreateShootSheet({ open, onClose, modelId, onCreated }) {
           </div>
         ))}
 
-        <div className="list-section-title" style={{ margin: '12px 0 6px' }}>Съёмка</div>
+        <div className="list-section-title" style={{ margin: '12px 0 6px' }}>{t('models.shootSection')}</div>
         <div className="input-group">
-          <div className="input-label">Дата</div>
+          <div className="input-label">{t('shoots.date')}</div>
           <input type="date" value={form.shoot_date} onChange={e => f('shoot_date', e.target.value)} />
         </div>
         <div className="input-group">
-          <div className="input-label">Локация</div>
-          <input value={form.location} onChange={e => f('location', e.target.value)} placeholder="Город, место" />
+          <div className="input-label">{t('shoots.location')}</div>
+          <input value={form.location} onChange={e => f('location', e.target.value)} />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <div className="input-group" style={{ flex: 1 }}>
-            <div className="input-label">Ставка</div>
+            <div className="input-label">{t('shoots.rate')}</div>
             <input type="number" value={form.rate} onChange={e => f('rate', e.target.value)} placeholder="0" />
           </div>
           <div className="input-group" style={{ width: 84 }}>
-            <div className="input-label">Валюта</div>
+            <div className="input-label">{t('shoots.currency')}</div>
             <select value={form.currency} onChange={e => f('currency', e.target.value)}>
               <option value="EUR">EUR</option>
               <option value="USD">USD</option>
@@ -547,14 +546,14 @@ function CreateShootSheet({ open, onClose, modelId, onCreated }) {
           </div>
         </div>
         <div className="input-group">
-          <div className="input-label">Статус</div>
+          <div className="input-label">{t('shoots.status')}</div>
           <select value={form.status} onChange={e => f('status', e.target.value)}>
             {STATUSES_CREATE.map(s => <option key={s} value={s}>{t(`shoots.statusLabels.${s}`)}</option>)}
           </select>
         </div>
         <div className="input-group">
-          <div className="input-label">Заметки</div>
-          <textarea value={form.notes} onChange={e => f('notes', e.target.value)} rows={2} placeholder="Условия, детали..." />
+          <div className="input-label">{t('shoots.notes')}</div>
+          <textarea value={form.notes} onChange={e => f('notes', e.target.value)} rows={2} />
         </div>
       </div>
       <button
@@ -563,7 +562,7 @@ function CreateShootSheet({ open, onClose, modelId, onCreated }) {
         onClick={save}
         disabled={saving || !form.photographer_name.trim()}
       >
-        {saving ? '...' : 'Создать съёмку'}
+        {saving ? '...' : t('models.createShoot')}
       </button>
     </Sheet>
   );

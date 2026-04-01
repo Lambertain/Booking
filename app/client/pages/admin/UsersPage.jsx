@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../api.js';
+import { useLang } from '../../i18n/useLang.js';
 
 const ROLES = ['admin', 'manager', 'model', 'client'];
 
 export default function UsersPage() {
+  const { t } = useLang();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,14 +34,14 @@ export default function UsersPage() {
     setUsers(us => us.map(x => x.id === u.id ? { ...x, ...updated } : x));
   }
 
-  if (loading) return <div className="loader">Завантаження...</div>;
+  if (loading) return <div className="loader">{t('loading')}</div>;
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div className="page-title">Користувачі</div>
+        <div className="page-title">{t('users.title')}</div>
         <button className="btn-primary" onClick={() => setShowForm(v => !v)}>
-          {showForm ? 'Скасувати' : '+ Додати'}
+          {showForm ? t('cancel') : `+ ${t('add')}`}
         </button>
       </div>
 
@@ -49,15 +51,15 @@ export default function UsersPage() {
             <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
               {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <input placeholder="Ім'я" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+            <input placeholder={t('users.name')} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
             <input placeholder="Email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-            <input placeholder="Пароль" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+            <input placeholder={t('users.password')} type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
             <input placeholder="Telegram ID" value={form.telegram_id} onChange={e => setForm(f => ({ ...f, telegram_id: e.target.value }))} />
             {form.role === 'model' && (
-              <input placeholder="Slug (напр. ana-v)" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} />
+              <input placeholder={t('users.slugHint')} value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} />
             )}
             {error && <div className="error" style={{ gridColumn: '1/-1' }}>{error}</div>}
-            <button className="btn-primary" type="submit" style={{ gridColumn: '1/-1' }}>Створити</button>
+            <button className="btn-primary" type="submit" style={{ gridColumn: '1/-1' }}>{t('users.create')}</button>
           </form>
         </div>
       )}
@@ -66,7 +68,7 @@ export default function UsersPage() {
         <table>
           <thead>
             <tr>
-              <th>Ім'я</th><th>Роль</th><th>Email</th><th>Telegram</th><th>Статус</th><th></th>
+              <th>{t('users.name')}</th><th>{t('users.role')}</th><th>{t('users.email')}</th><th>Telegram</th><th>{t('users.status')}</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -77,16 +79,16 @@ export default function UsersPage() {
                 <td style={{ color: 'var(--text2)' }}>{u.email || '—'}</td>
                 <td style={{ color: 'var(--text2)' }}>
                   {u.telegram_username ? `@${u.telegram_username}` : '—'}
-                  {u.sub_status === 'blocked' && <span title="Заблокував бота" style={{ marginLeft: 4 }}>🚫</span>}
+                  {u.sub_status === 'blocked' && <span title={t('users.blocked')} style={{ marginLeft: 4 }}>🚫</span>}
                 </td>
                 <td>
                   <span className={`badge ${u.is_active ? 'badge-confirmed' : 'badge-cancelled'}`}>
-                    {u.is_active ? 'Активний' : 'Заблокований'}
+                    {u.is_active ? t('users.active') : t('users.blocked')}
                   </span>
                 </td>
                 <td>
                   <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => toggleActive(u)}>
-                    {u.is_active ? 'Блок' : 'Розблок'}
+                    {u.is_active ? t('users.block') : t('users.unblock')}
                   </button>
                 </td>
               </tr>

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../api.js';
+import { useLang } from '../i18n/useLang.js';
 
 export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTags }) {
+  const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tags, setTags] = useState(null);
@@ -21,13 +23,13 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
   }
 
   function removeTag(tag) {
-    setTags(t => t.filter(x => x !== tag));
+    setTags(tgs => tgs.filter(x => x !== tag));
   }
 
   function addTag(tag) {
-    const t = tag.trim();
-    if (!t || tags.includes(t)) return;
-    setTags(prev => [...prev, t]);
+    const trimmed = tag.trim();
+    if (!trimmed || tags.includes(trimmed)) return;
+    setTags(prev => [...prev, trimmed]);
     setNewTag('');
   }
 
@@ -51,28 +53,26 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
     onClose();
   }
 
-  // Tags not yet assigned to this subscriber (for quick-add)
-  const unassigned = (allTags || []).filter(t => !(editing ? tags : subscriber.tags || []).includes(t));
+  const unassigned = (allTags || []).filter(tag => !(editing ? tags : subscriber.tags || []).includes(tag));
 
   return (
-    <Sheet open={!!subscriber} onClose={handleClose} title={editing ? '✏️ Редагування' : (subscriber.full_name || subscriber.username || `tg:${subscriber.telegram_id}`)}>
+    <Sheet open={!!subscriber} onClose={handleClose} title={editing ? t('editing') : (subscriber.full_name || subscriber.username || `tg:${subscriber.telegram_id}`)}>
       {editing ? (
         <div>
           <div className="input-group">
-            <div className="input-label">Ім'я</div>
-            <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Повне ім'я" />
+            <div className="input-label">{t('subscriber.name')}</div>
+            <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder={t('subscriber.fullNamePh')} />
           </div>
 
           <div className="input-group">
-            <div className="input-label">Статус</div>
+            <div className="input-label">{t('subscriber.status')}</div>
             <select value={status} onChange={e => setStatus(e.target.value)}>
-              <option value="active">✅ Активний</option>
-              <option value="blocked">🚫 Заблокований</option>
+              <option value="active">{t('subscriber.active')}</option>
+              <option value="blocked">{t('subscriber.blocked')}</option>
             </select>
           </div>
 
-          {/* Current tags */}
-          <div className="input-label" style={{ marginBottom: 6 }}>Теги ({tags.length})</div>
+          <div className="input-label" style={{ marginBottom: 6 }}>{t('subscriber.tags')} ({tags.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
             {tags.map(tag => (
               <span
@@ -92,27 +92,25 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
                 </button>
               </span>
             ))}
-            {tags.length === 0 && <span style={{ fontSize: 13, color: 'var(--text3)' }}>Тегів немає</span>}
+            {tags.length === 0 && <span style={{ fontSize: 13, color: 'var(--text3)' }}>{t('subscriber.noTags')}</span>}
           </div>
 
-          {/* Add custom tag */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
             <input
               value={newTag}
               onChange={e => setNewTag(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTag(newTag)}
-              placeholder="Новий тег..."
+              placeholder={t('subscriber.newTagPh')}
               style={{ flex: 1 }}
             />
             <button className="btn btn-secondary" onClick={() => addTag(newTag)} disabled={!newTag.trim()}>
-              + Додати
+              {t('subscriber.addTag')}
             </button>
           </div>
 
-          {/* Quick-add from existing tags */}
           {unassigned.length > 0 && (
             <>
-              <div className="input-label" style={{ marginBottom: 6 }}>Наявні теги (тисни для додавання)</div>
+              <div className="input-label" style={{ marginBottom: 6 }}>{t('subscriber.availableTags')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 16 }}>
                 {unassigned.map(tag => (
                   <button
@@ -131,9 +129,9 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
           )}
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>Скасувати</button>
+            <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>{t('cancel')}</button>
             <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
-              {saving ? 'Збереження...' : 'Зберегти'}
+              {saving ? t('saving') : t('save')}
             </button>
           </div>
         </div>
@@ -144,7 +142,7 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
               background: subscriber.status === 'active' ? 'var(--green)' : 'var(--text3)',
               color: '#fff', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600,
             }}>
-              {subscriber.status === 'active' ? '✅ Активний' : '🚫 Заблокований'}
+              {subscriber.status === 'active' ? t('subscriber.active') : t('subscriber.blocked')}
             </span>
           </div>
 
@@ -152,8 +150,8 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
             {[
               ['Telegram', subscriber.username ? `@${subscriber.username}` : null],
               ['Telegram ID', subscriber.telegram_id],
-              ['Підписався', subscriber.subscribed_at ? new Date(subscriber.subscribed_at).toLocaleDateString('uk-UA') : null],
-              ['Активність', subscriber.last_activity_at ? new Date(subscriber.last_activity_at).toLocaleDateString('uk-UA') : null],
+              [t('subscriber.subscribedAt'), subscriber.subscribed_at ? new Date(subscriber.subscribed_at).toLocaleDateString() : null],
+              [t('subscriber.lastActivity'), subscriber.last_activity_at ? new Date(subscriber.last_activity_at).toLocaleDateString() : null],
             ].map(([label, value]) => value ? (
               <div key={label} style={{ display: 'flex', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--separator)' }}>
                 <span style={{ color: 'var(--text3)', fontSize: 13, minWidth: 110 }}>{label}</span>
@@ -162,14 +160,13 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
             ) : null)}
           </div>
 
-          {/* Tags */}
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8 }}>
-              Теги ({(subscriber.tags || []).length})
+              {t('subscriber.tags')} ({(subscriber.tags || []).length})
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {(subscriber.tags || []).length === 0 ? (
-                <span style={{ fontSize: 13, color: 'var(--text3)' }}>Немає тегів</span>
+                <span style={{ fontSize: 13, color: 'var(--text3)' }}>{t('subscriber.noTags')}</span>
               ) : (subscriber.tags || []).map(tag => (
                 <span key={tag} style={{
                   background: 'var(--accent-bg)', color: 'var(--accent)',
@@ -182,7 +179,7 @@ export default function SubscriberSheet({ subscriber, onClose, onUpdated, allTag
           </div>
 
           <button className="btn btn-primary btn-full" style={{ marginTop: 20 }} onClick={openEdit}>
-            ✏️ Редагувати
+            {t('subscriber.edit')}
           </button>
         </div>
       )}

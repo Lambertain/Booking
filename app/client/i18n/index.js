@@ -41,7 +41,8 @@ export function onLangChange(fn) {
 }
 
 // t('shoots.title') → string
-export function t(key) {
+// t('broadcast.send', { count: 5 }) → '📣 Надіслати 5 отримувачам'
+export function t(key, vars) {
   const parts = key.split('.');
   let val = LOCALES[currentLang];
   for (const p of parts) {
@@ -52,6 +53,9 @@ export function t(key) {
     // Fallback to uk
     val = LOCALES.uk;
     for (const p of parts) val = val?.[p];
+  }
+  if (typeof val === 'string' && vars) {
+    val = val.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
   }
   return val ?? key;
 }

@@ -6,6 +6,7 @@ import TopBar from '../components/TopBar.jsx';
 import Sheet from '../components/Sheet.jsx';
 
 function BroadcastSheet({ open, onClose }) {
+  const { t } = useLang();
   const [tags, setTags] = useState([]);
   const [allTotal, setAllTotal] = useState(0);
   const [selectedTags, setSelectedTags] = useState([]);
@@ -32,7 +33,7 @@ function BroadcastSheet({ open, onClose }) {
 
   function toggleTag(tag) {
     setSelectedTags(prev => {
-      const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag];
+      const next = prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag];
       updateCount(next);
       return next;
     });
@@ -43,7 +44,7 @@ function BroadcastSheet({ open, onClose }) {
     setSending(true);
     try {
       const d = await api.post('/api/broadcast', { text: text.trim(), tags: selectedTags });
-      setResult(`✅ Відправляється ${d.count} повідомлень`);
+      setResult(t('broadcast.sentResult', { count: d.count }));
       setText('');
     } catch (err) {
       setResult(`❌ ${err.message}`);
@@ -53,10 +54,10 @@ function BroadcastSheet({ open, onClose }) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="📣 Розсилка">
+    <Sheet open={open} onClose={onClose} title={t('broadcast.title')}>
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
-          Теги (не обрано = всі активні):
+          {t('broadcast.tagsHint')}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {tags.map(({ tag, count: tc }) => (
@@ -76,16 +77,16 @@ function BroadcastSheet({ open, onClose }) {
       </div>
 
       <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
-        Отримувачів: <b style={{ color: 'var(--text1)' }}>{count}</b> з {allTotal} активних
+        {t('broadcast.recipients')} <b style={{ color: 'var(--text1)' }}>{count}</b> {t('broadcast.ofActive', { total: allTotal })}
       </div>
 
       <div className="input-group">
-        <div className="input-label">Повідомлення</div>
+        <div className="input-label">{t('broadcast.messageLabel')}</div>
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
           rows={5}
-          placeholder="Текст повідомлення..."
+          placeholder={t('broadcast.messagePh')}
           style={{ resize: 'vertical' }}
         />
       </div>
@@ -97,7 +98,7 @@ function BroadcastSheet({ open, onClose }) {
       )}
 
       <button className="btn btn-primary btn-full" onClick={send} disabled={!text.trim() || sending}>
-        {sending ? 'Відправка...' : `📣 Надіслати ${count} отримувачам`}
+        {sending ? t('broadcast.sending') : t('broadcast.send', { count })}
       </button>
     </Sheet>
   );
@@ -148,7 +149,7 @@ export default function ChatsScreen({ user }) {
           <button
             onClick={() => setBroadcastOpen(true)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22 }}
-            title="Розсилка"
+            title={t('broadcast.tooltip')}
           >
             📣
           </button>
@@ -170,7 +171,7 @@ export default function ChatsScreen({ user }) {
               <div className="list-item-body">
                 <div className="list-item-title">
                   {name}
-                  {blocked && <span title="Заблокував бота" style={{ marginLeft: 6, fontSize: 14 }}>🚫</span>}
+                  {blocked && <span title={t('users.botBlocked')} style={{ marginLeft: 6, fontSize: 14 }}>🚫</span>}
                 </div>
                 <div className="list-item-subtitle">{c.last_message || t('conversations.noMessages')}</div>
               </div>
