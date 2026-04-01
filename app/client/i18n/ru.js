@@ -44,6 +44,7 @@ export default {
     chat: '💬 Чат с менеджером',
     orders: '📋 Заказы',
     templates: '📄 Шаблоны',
+    analytics: '📊 Аналитика',
   },
 
   shoots: {
@@ -285,6 +286,27 @@ export default {
       done: 'Выполнено',
       delete: 'Удалить',
     },
+  },
+
+  analytics: {
+    title: 'Аналитика',
+    nav: 'Аналитика',
+    day: 'День',
+    week: 'Неделя',
+    month: 'Месяц',
+    year: 'Год',
+    bar: 'Столбцы',
+    line: 'Линии',
+    processed: 'Обработано',
+    approved: 'Отправлено',
+    edited: 'Отредактировано',
+    skipped: 'Пропущено',
+    pending: 'Ожидает',
+    noData: 'Нет данных за этот период',
+    totalProcessed: 'Обработано',
+    totalApproved: 'Отправлено',
+    totalEdited: 'Отредактировано',
+    totalSkipped: 'Пропущено',
   },
 
   settings: {

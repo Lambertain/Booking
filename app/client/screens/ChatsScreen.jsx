@@ -276,7 +276,7 @@ function ChatThread({ conv, user, onBack }) {
   const canRegister = (user.role === 'admin' || user.role === 'manager');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar
         title={otherName}
         left={<button className="back-btn" onClick={onBack}>‹ {t('back')}</button>}

@@ -7,6 +7,7 @@ import ModelsScreen from './screens/ModelsScreen.jsx';
 import ChatsScreen from './screens/ChatsScreen.jsx';
 import ClientsScreen from './screens/ClientsScreen.jsx';
 import SettingsScreen from './screens/SettingsScreen.jsx';
+import AnalyticsScreen from './screens/AnalyticsScreen.jsx';
 
 import LoginPage from './pages/LoginPage.jsx';
 
@@ -51,6 +52,12 @@ const Icons = {
       <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
       <rect x="9" y="3" width="6" height="4" rx="1"/>
       <path d="M9 12h6M9 16h4"/>
+    </svg>
+  ),
+  analytics: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <path d="M7 16l3-4 3 3 3-5"/>
     </svg>
   ),
 };
@@ -126,10 +133,11 @@ export default function App() {
   // Build tabs per effective role
   const tabs = [];
   if (effectiveRole === 'admin' || effectiveRole === 'manager') {
-    tabs.push({ key: 'models',   icon: Icons.models,   label: t('nav.models') });
-    tabs.push({ key: 'clients',  icon: Icons.clients,  label: t('nav.clients') });
-    tabs.push({ key: 'chats',    icon: Icons.chats,    label: t('nav.chats') });
-    tabs.push({ key: 'settings', icon: Icons.settings, label: t('nav.settings') });
+    tabs.push({ key: 'models',    icon: Icons.models,    label: t('nav.models') });
+    tabs.push({ key: 'clients',   icon: Icons.clients,   label: t('nav.clients') });
+    tabs.push({ key: 'chats',     icon: Icons.chats,     label: t('nav.chats') });
+    tabs.push({ key: 'analytics', icon: Icons.analytics, label: t('analytics.nav') });
+    tabs.push({ key: 'settings',  icon: Icons.settings,  label: t('nav.settings') });
   } else if (effectiveRole === 'model') {
     tabs.push({ key: 'models',   icon: Icons.myshoot,  label: t('nav.myShoot2') });
     tabs.push({ key: 'chats',    icon: Icons.chats,    label: t('nav.chats') });
@@ -149,7 +157,8 @@ export default function App() {
     switch (validTab) {
       case 'models':   return <ModelsScreen user={effectiveUser} />;
       case 'chats':    return <ChatsScreen user={effectiveUser} onUnreadChange={setUnreadCount} />;
-      case 'clients':  return <ClientsScreen user={effectiveUser} />;
+      case 'clients':   return <ClientsScreen user={effectiveUser} />;
+      case 'analytics': return <AnalyticsScreen user={effectiveUser} />;
       case 'settings':
         return (
           <SettingsScreen
@@ -190,7 +199,7 @@ export default function App() {
       )}
 
       {/* Main scrollable content */}
-      <div className="screen" style={{ flex: 1 }}>
+      <div className="screen" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {renderScreen()}
       </div>
 

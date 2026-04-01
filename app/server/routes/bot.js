@@ -185,6 +185,9 @@ async function handleCallbackQuery(cbq) {
     const approverId = approverUser?.id || 1;
     const replyMsg = await deliverApprovedReply(conv.id, userMsg.ai_draft, approverId);
 
+    // Record analytics: approved
+    await query('UPDATE messages SET bot_action = $1 WHERE id = $2', ['approved', msgId]).catch(() => {});
+
     // Forward reply to the other participant in Telegram
     const recipientId = conv.participant_a === approverId ? conv.participant_b : conv.participant_a;
     const senderName = approverUser?.name || 'Менеджер';
@@ -209,6 +212,9 @@ async function handleCallbackQuery(cbq) {
     await tgPost('answerCallbackQuery', { callback_query_id: cbq.id, text: 'Введіть текст' });
 
   } else if (action === 'apka_skip') {
+    // Record analytics: skipped
+    await query('UPDATE messages SET bot_action = $1 WHERE id = $2', ['skipped', msgId]).catch(() => {});
+
     await tgPost('editMessageReplyMarkup', {
       chat_id: tgChatId,
       message_id: tgMsgId,
@@ -237,6 +243,9 @@ async function handleEditReply(tgChatId, editedText, tgUser) {
 
   const { deliverApprovedReply, forwardToTelegram } = require('../bot-notify');
   await deliverApprovedReply(conv.id, editedText, approverId);
+
+  // Record analytics: edited
+  await query('UPDATE messages SET bot_action = $1 WHERE id = $2', ['edited', pending.msgId]).catch(() => {});
 
   const recipientId = conv.participant_a === approverId ? conv.participant_b : conv.participant_a;
   const senderName = approverUser?.name || 'Менеджер';

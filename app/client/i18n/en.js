@@ -44,6 +44,7 @@ export default {
     chat: '💬 Chat with manager',
     orders: '📋 Orders',
     templates: '📄 Templates',
+    analytics: '📊 Analytics',
   },
 
   shoots: {
@@ -285,6 +286,27 @@ export default {
       done: 'Done',
       delete: 'Delete',
     },
+  },
+
+  analytics: {
+    title: 'Analytics',
+    nav: 'Analytics',
+    day: 'Day',
+    week: 'Week',
+    month: 'Month',
+    year: 'Year',
+    bar: 'Bar',
+    line: 'Line',
+    processed: 'Processed',
+    approved: 'Approved',
+    edited: 'Edited',
+    skipped: 'Skipped',
+    pending: 'Pending',
+    noData: 'No data for this period',
+    totalProcessed: 'Processed',
+    totalApproved: 'Approved',
+    totalEdited: 'Edited',
+    totalSkipped: 'Skipped',
   },
 
   settings: {

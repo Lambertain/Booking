@@ -47,6 +47,7 @@ export default {
     chat: '💬 Чат з менеджером',
     orders: '📋 Замовлення',
     templates: '📄 Шаблони',
+    analytics: '📊 Аналітика',
   },
 
   // Shoots
@@ -291,6 +292,27 @@ export default {
       done: 'Виконано',
       delete: 'Видалити',
     },
+  },
+
+  analytics: {
+    title: 'Аналітика',
+    nav: 'Аналітика',
+    day: 'День',
+    week: 'Тиждень',
+    month: 'Місяць',
+    year: 'Рік',
+    bar: 'Стовпці',
+    line: 'Лінії',
+    processed: 'Оброблено',
+    approved: 'Відправлено',
+    edited: 'Відредаговано',
+    skipped: 'Пропущено',
+    pending: 'Очікує',
+    noData: 'Немає даних за цей період',
+    totalProcessed: 'Оброблено',
+    totalApproved: 'Відправлено',
+    totalEdited: 'Відредаговано',
+    totalSkipped: 'Пропущено',
   },
 
   settings: {

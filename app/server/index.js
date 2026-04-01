@@ -24,6 +24,7 @@ app.use('/api/orders',        require('./routes/orders'));
 app.use('/api/templates',     require('./routes/templates'));
 app.use('/api/bot',           require('./routes/bot').router);
 app.use('/api/broadcast',     require('./routes/broadcast'));
+app.use('/api/analytics',    require('./routes/analytics'));
 
 // Serve React build in production
 const distDir = path.join(__dirname, '../dist');
