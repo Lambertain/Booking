@@ -281,9 +281,12 @@ function ChatThread({ conv, user, onBack }) {
         title={otherName}
         left={<button className="back-btn" onClick={onBack}>‹ {t('back')}</button>}
         right={canRegister && (
-          <button className="btn btn-sm btn-secondary" onClick={() => setRegisterSheet(true)}>
-            + {t('users.register')}
-          </button>
+          <button onClick={() => setRegisterSheet(true)} style={{
+            width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)',
+            border: 'none', color: '#fff', fontSize: 22, lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', flexShrink: 0,
+          }}>+</button>
         )}
       />
 
