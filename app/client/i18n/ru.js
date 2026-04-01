@@ -266,6 +266,7 @@ export default {
     systemUsers: 'Системные юзеры',
     botContacts: 'Контакты (бот)',
     crmStatus: 'Статус CRM',
+    crmStatusPh: 'В работе, Удалить...',
     rentalFrom: 'Аренда от',
     contactName: 'Контакт',
     contactEmail: 'Email контакта',

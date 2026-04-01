@@ -127,7 +127,7 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
 
           <div className="input-group">
             <div className="input-label">{t('templates.crmStatus')}</div>
-            <input value={form.deal_step} onChange={e => set('deal_step', e.target.value)} placeholder="В работе, Удалить..." />
+            <input value={form.deal_step} onChange={e => set('deal_step', e.target.value)} placeholder={t('templates.crmStatusPh')} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

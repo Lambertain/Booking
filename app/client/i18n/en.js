@@ -266,6 +266,7 @@ export default {
     systemUsers: 'System users',
     botContacts: 'Contacts (bot)',
     crmStatus: 'CRM Status',
+    crmStatusPh: 'In progress, Delete...',
     rentalFrom: 'Rental from',
     contactName: 'Contact',
     contactEmail: 'Contact email',
