@@ -167,58 +167,91 @@ async function sendPurplePortReply(profileId, siteConfig, url, message) {
       throw new Error(`Reply form #message not found. Title: "${pageTitle}". Page: ${bodyText.replace(/\n/g, ' ')}`);
     }
 
-    // Set content via TinyMCE API
-    const editorSet = await page.evaluate((msg) => {
-      if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
-        const html = msg.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
-        tinymce.activeEditor.setContent(html);
-        return { ok: true, method: 'tinymce' };
-      }
-      // Fallback: fill textarea directly
-      const ta = document.querySelector('textarea#content');
-      if (ta) {
-        ta.value = msg;
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
-        return { ok: true, method: 'textarea' };
-      }
-      return { ok: false, method: null };
-    }, message);
-
-    if (!editorSet.ok) throw new Error('Could not set message content (TinyMCE or textarea not found)');
-    console.log(`[sender] PurplePort editor set via ${editorSet.method}`);
-    await page.waitForTimeout(1000);
-
-    // Submit the form — wait for navigation (form submit = redirect on success)
-    const navigationPromise = page.waitForNavigation({ timeout: 15000 }).catch(() => null);
-    await page.evaluate(() => {
-      if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
-        tinymce.activeEditor.save();
-      }
-      document.querySelector('form#message').submit();
+    // Count self-messages before sending (to verify after)
+    const selfCountBefore = await page.evaluate(() => {
+      return [...document.querySelectorAll('div.message div.content')]
+        .filter(block => {
+          const author = block.querySelector('a.portlink');
+          return !author || (author.textContent || '').trim() === 'Me';
+        }).length;
     });
-    await navigationPromise;
-    await page.waitForTimeout(2000);
+    console.log(`[sender] PurplePort self-messages before: ${selfCountBefore}`);
 
-    // Verify result: check final URL and page state
+    // Input text directly into TinyMCE iframe — most reliable, simulates real user
+    let inputMethod = 'none';
+    const tinyFrame = page.frameLocator('iframe#content_ifr, iframe[id$="_ifr"]').first();
+    const tinyBody = tinyFrame.locator('body');
+    const tinyFrameCount = await tinyBody.count().catch(() => 0);
+
+    if (tinyFrameCount > 0) {
+      // Click into TinyMCE body, select all, type new message
+      await tinyBody.click();
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Control+a');
+      await page.keyboard.press('Delete');
+      await page.waitForTimeout(200);
+      await tinyBody.type(message, { delay: 15 });
+      // Sync TinyMCE content back to textarea before submit
+      await page.evaluate(() => {
+        if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+          tinymce.activeEditor.save();
+        }
+      });
+      inputMethod = 'tinymce-iframe';
+    } else {
+      // Fallback: fill textarea directly
+      const ta = page.locator('textarea#content, textarea[name="content"]').first();
+      if (await ta.count() === 0) throw new Error('Could not find TinyMCE iframe or textarea to input message');
+      await ta.fill(message);
+      inputMethod = 'textarea';
+    }
+    console.log(`[sender] PurplePort message input via ${inputMethod}`);
+    await page.waitForTimeout(500);
+
+    // Click the submit button — triggers all JS handlers (more reliable than form.submit())
+    const submitBtn = page.locator(
+      'form#message input[type="submit"], form#message button[type="submit"], ' +
+      'form#message .submitbutton, form#message input[name="submit"], form#message input[value="Send"]'
+    ).first();
+
+    if (await submitBtn.count() === 0) throw new Error('Submit button not found in form#message');
+
+    const navigationPromise = page.waitForNavigation({ timeout: 20000 }).catch(() => null);
+    await submitBtn.click();
+    await navigationPromise;
+    await page.waitForTimeout(3000);
+
+    // Verify login not lost
     const finalUrl = page.url();
     console.log(`[sender] PurplePort after submit URL: ${finalUrl}`);
-
     if (finalUrl.includes('/login') || finalUrl.includes('/signin')) {
-      throw new Error(`Сесія PurplePort закінчилась під час відправки — потрібно перелогінитись`);
+      throw new Error(`Сесія PurplePort закінчилась під час відправки`);
     }
 
-    // If form is still present on page — submission likely failed
-    const formStillPresent = await page.locator('form#message').count();
-    if (formStillPresent) {
+    // Navigate back to conversation to count self-messages after send
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+
+    const selfCountAfter = await page.evaluate(() => {
+      return [...document.querySelectorAll('div.message div.content')]
+        .filter(block => {
+          const author = block.querySelector('a.portlink');
+          return !author || (author.textContent || '').trim() === 'Me';
+        }).length;
+    });
+    console.log(`[sender] PurplePort self-messages after: ${selfCountAfter}`);
+
+    if (selfCountAfter <= selfCountBefore) {
+      // Grab any visible error on page
       const errorText = await page.evaluate(() => {
-        const selectors = ['.error', '.alert-danger', '.flash-error', '.message.error', 'p.error'];
+        const selectors = ['.error', '.alert-danger', '.flash-error', 'p.error', '.errormsg'];
         for (const sel of selectors) {
           const el = document.querySelector(sel);
           if (el && el.textContent.trim()) return el.textContent.trim();
         }
         return null;
       });
-      throw new Error(`Форма відповіді досі на сторінці після submit${errorText ? ` — помилка: ${errorText}` : ' — можливо CSRF або валідація'}`);
+      throw new Error(`Повідомлення не з'явилось у розмові після відправки${errorText ? ` — помилка: ${errorText}` : ' — можливо пустий контент або CSRF'}`);
     }
 
     return { ok: true, url };
