@@ -69,6 +69,7 @@ export default function App() {
   const [tab, setTab] = useState('models');
   const [impersonatedRole, setImpersonatedRole] = useState(null); // 'manager'|'model'|'client'|null
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatActive, setChatActive] = useState(false);
 
   // Effective role for UI rendering
   const effectiveRole = impersonatedRole || user?.role;
@@ -156,7 +157,7 @@ export default function App() {
   function renderScreen() {
     switch (validTab) {
       case 'models':   return <ModelsScreen user={effectiveUser} />;
-      case 'chats':    return <ChatsScreen user={effectiveUser} onUnreadChange={setUnreadCount} />;
+      case 'chats':    return <ChatsScreen user={effectiveUser} onUnreadChange={setUnreadCount} onChatActive={setChatActive} />;
       case 'clients':   return <ClientsScreen user={effectiveUser} />;
       case 'analytics': return <AnalyticsScreen user={effectiveUser} />;
       case 'settings':
@@ -204,12 +205,14 @@ export default function App() {
       </div>
 
       {/* Bottom TabBar */}
-      <TabBar
-        tabs={tabs}
-        active={validTab}
-        onChange={setTab}
-        badges={{ chats: unreadCount }}
-      />
+      {!chatActive && (
+        <TabBar
+          tabs={tabs}
+          active={validTab}
+          onChange={setTab}
+          badges={{ chats: unreadCount }}
+        />
+      )}
     </div>
   );
 }

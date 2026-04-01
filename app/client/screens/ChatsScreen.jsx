@@ -104,7 +104,7 @@ function BroadcastSheet({ open, onClose }) {
   );
 }
 
-export default function ChatsScreen({ user }) {
+export default function ChatsScreen({ user, onChatActive }) {
   const { t } = useLang();
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
@@ -122,7 +122,7 @@ export default function ChatsScreen({ user }) {
       <ChatThread
         conv={active}
         user={user}
-        onBack={() => setActive(null)}
+        onBack={() => { setActive(null); onChatActive?.(false); }}
         onConvUpdated={updated => setConvs(c => c.map(x => x.id === updated.id ? updated : x))}
       />
     );
@@ -166,7 +166,7 @@ export default function ChatsScreen({ user }) {
           const unread = parseInt(c.unread) || 0;
           const blocked = convBotBlocked(c);
           return (
-            <div key={c.id} className="list-item" onClick={() => setActive(c)}>
+            <div key={c.id} className="list-item" onClick={() => { setActive(c); onChatActive?.(true); }}>
               <Avatar name={name} size={44} />
               <div className="list-item-body">
                 <div className="list-item-title">
@@ -276,7 +276,7 @@ function ChatThread({ conv, user, onBack }) {
   const canRegister = (user.role === 'admin' || user.role === 'manager');
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 101, background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <TopBar
         title={otherName}
         left={<button className="back-btn" onClick={onBack}>‹ {t('back')}</button>}

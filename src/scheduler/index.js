@@ -60,7 +60,18 @@ async function processSendQueue() {
       || err.message.includes('browserType.connectOverCDP');
 
     if (isBrowserCrash) {
-      console.log('[scheduler] 🔄 Browser crash detected — restarting AdsPower profile...');
+      const crashCount = (toSend._crashCount || 0) + 1;
+      console.log(`[scheduler] 🔄 Browser crash #${crashCount} — restarting AdsPower profile...`);
+
+      // After 3 browser crashes for the same item — treat as hard failure
+      if (crashCount >= 3) {
+        console.error(`[scheduler] ❌ ${crashCount} browser crashes — giving up on this item`);
+        const { onDeliveryResult } = require('../bot/index');
+        onDeliveryResult(false, toSend.photographer, toSend.site, `Browser crashed ${crashCount} times: ${err.message}`);
+        sendPaused = true;
+        return;
+      }
+
       try {
         const { stopProfile } = require('../extractor/adspower');
         const configPath = path.join(MODELS_DIR, toSend.modelSlug, 'config.json');
@@ -72,7 +83,7 @@ async function processSendQueue() {
       }
       console.log('[scheduler] Waiting 10s before retry...');
       await new Promise(r => setTimeout(r, 10000));
-      updateSendFirst({ _retryCount: 0 }); // reset counter for clean retry
+      updateSendFirst({ _crashCount: crashCount, _retryCount: 0 });
       try { await processSendQueue(); } catch {}
       return;
     }
