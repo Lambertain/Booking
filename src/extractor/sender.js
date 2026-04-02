@@ -145,18 +145,24 @@ async function sendModelKarteiReply(profileId, siteConfig, url, message, mediaFi
 
     const sendBtn = page.locator('form#pnSendForm button[type="submit"]');
     if (await sendBtn.count() === 0) throw new Error('Send button not found');
+
+    // Count self-messages before sending (to verify after)
+    const selfCountBefore = await page.evaluate(() =>
+      document.querySelectorAll('.sedcard1').length
+    );
+    console.log(`[sender] Model-Kartei self-messages before: ${selfCountBefore}`);
+
     await sendBtn.click();
     await page.waitForTimeout(5000);
 
-    // Reload page and verify message appears in conversation
+    // Reload page and verify new self-message appeared
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForTimeout(2000);
-    const sent = await page.evaluate((msg) => {
-      // Model-Kartei: self messages have class sedcard1
-      const selfMsgs = [...document.querySelectorAll('.sedcard1')].map(el => el.innerText || '');
-      return selfMsgs.some(t => t.includes(msg.slice(0, 30)));
-    }, message);
-    if (!sent) throw new Error('Повідомлення не знайдено в розмові після відправки (model-kartei)');
+    const selfCountAfter = await page.evaluate(() =>
+      document.querySelectorAll('.sedcard1').length
+    );
+    console.log(`[sender] Model-Kartei self-messages after: ${selfCountAfter}`);
+    if (selfCountAfter <= selfCountBefore) throw new Error('Повідомлення не з\'явилось у розмові після відправки (model-kartei)');
 
     return { ok: true, url };
   } finally {

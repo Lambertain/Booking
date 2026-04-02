@@ -166,7 +166,8 @@ async function handleApprovalResult(action, text) {
 
     // Trigger immediate send + reset scan timer
     try {
-      const { triggerSend } = require('../scheduler/index');
+      const { triggerSend, resumeSending } = require('../scheduler/index');
+      resumeSending(); // reset sendPaused in case previous delivery failed
       triggerSend();
     } catch {}
 
