@@ -109,7 +109,7 @@ router.get('/ai-draft/:msgId', async (req, res) => {
 // POST /api/sync/delivery — log delivery result from booking bot
 router.post('/delivery', requireSyncSecret, async (req, res) => {
   try {
-    const { modelSlug, modelName, photographer, site, status, error } = req.body;
+    const { modelSlug, modelName, photographer, site, status, error, action } = req.body;
     if (!modelSlug || !photographer || !site || !status) {
       return res.status(400).json({ error: 'modelSlug, photographer, site, status required' });
     }
@@ -117,9 +117,9 @@ router.post('/delivery', requireSyncSecret, async (req, res) => {
       return res.status(400).json({ error: 'status must be sent or failed' });
     }
     await query(
-      `INSERT INTO delivery_log (model_slug, model_name, photographer, site, status, error_message)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [modelSlug, modelName || null, photographer, site, status, error || null]
+      `INSERT INTO delivery_log (model_slug, model_name, photographer, site, status, error_message, action)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [modelSlug, modelName || null, photographer, site, status, error || null, action || null]
     );
     console.log(`[sync/delivery] ${status}: ${photographer} (${site}) → ${modelSlug}`);
     res.status(201).json({ ok: true });

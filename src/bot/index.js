@@ -154,6 +154,7 @@ async function handleApprovalResult(action, text) {
       photographer: item.photographer,
       url: item.url,
       text: finalText,
+      action: action === 'edit' ? 'edited' : 'approved',
       mediaFiles: editMediaFiles.length > 0 ? editMediaFiles : undefined
     });
 

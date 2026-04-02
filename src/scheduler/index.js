@@ -6,14 +6,14 @@ const { sendReply } = require('../extractor/sender');
 
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 
-async function syncDelivery(modelSlug, photographer, site, status, errorMsg) {
+async function syncDelivery(modelSlug, photographer, site, status, errorMsg, action) {
   const { APP_API_URL, APP_API_SECRET } = process.env;
   if (!APP_API_URL || !APP_API_SECRET) return;
   try {
     await fetch(`${APP_API_URL}/api/sync/delivery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${APP_API_SECRET}` },
-      body: JSON.stringify({ modelSlug, photographer, site, status, error: errorMsg || null }),
+      body: JSON.stringify({ modelSlug, photographer, site, status, error: errorMsg || null, action: action || null }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {}
@@ -62,7 +62,7 @@ async function processSendQueue() {
     console.log(`[scheduler] ✅ Надіслано: ${toSend.photographer} (${toSend.site})`);
     const { onDeliveryResult } = require('../bot/index');
     onDeliveryResult(true, toSend.photographer, toSend.site, null, toSend.url);
-    syncDelivery(toSend.modelSlug, toSend.photographer, toSend.site, 'sent', null);
+    syncDelivery(toSend.modelSlug, toSend.photographer, toSend.site, 'sent', null, toSend.action);
   } catch (err) {
     console.error(`[scheduler] ❌ Помилка відправки ${toSend.photographer}: ${err.message}`);
 

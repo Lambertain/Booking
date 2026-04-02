@@ -307,12 +307,14 @@ export default {
     totalApproved: 'Отправлено',
     totalEdited: 'Отредактировано',
     totalSkipped: 'Пропущено',
-    botDelivery: 'Отправлено менеджером',
+    seen: 'Обработано',
     sent: 'Отправлено',
+    edited: 'Отредактировано',
+    skipped: 'Пропущено',
     errors: 'Ошибки',
-    seen: 'Проверено',
-    queued: 'В очереди',
-    lastErrors: '⚠️ Последние ошибки доставки:',
+    lastErrors: 'Последние ошибки',
+    allModels: 'Все модели',
+    failed: 'Ошибка',
   },
 
   settings: {
