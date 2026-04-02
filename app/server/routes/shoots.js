@@ -1,6 +1,7 @@
 const express = require('express');
 const { query, one, all } = require('../db');
 const { requireAuth } = require('../auth');
+const { syncShootToAllumma } = require('../allumma-sync');
 
 const router = express.Router();
 
@@ -90,6 +91,32 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
       `UPDATE shoots SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
       vals
     );
+
+    // Sync to Allumma when shoot is marked as done (реалізована)
+    if (req.body.status === 'done' && !row.allumma_synced_at && row.rate) {
+      try {
+        const model = await one('SELECT name FROM users WHERE id = $1', [row.model_id]);
+        const shootDate = row.shoot_date
+          ? new Date(row.shoot_date).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
+
+        const result = await syncShootToAllumma({
+          bookingShootId: row.id,
+          shootDate,
+          rate: parseFloat(row.rate),
+          currency: row.currency || 'EUR',
+          modelName: model?.name || null,
+        });
+
+        if (result && !result.alreadySynced) {
+          await query('UPDATE shoots SET allumma_synced_at = NOW() WHERE id = $1', [row.id]);
+          row.allumma_synced_at = new Date();
+        }
+      } catch (err) {
+        console.error('[allumma-sync] Failed for shoot', row.id, ':', err.message);
+      }
+    }
+
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
