@@ -208,17 +208,20 @@ async function sendPurplePortReply(profileId, siteConfig, url, message) {
     console.log(`[sender] PurplePort message input via ${inputMethod}`);
     await page.waitForTimeout(500);
 
-    // Click the submit button — triggers all JS handlers (more reliable than form.submit())
-    const submitBtn = page.locator(
-      'form#message input[type="submit"], form#message button[type="submit"], ' +
-      'form#message .submitbutton, form#message input[name="submit"], form#message input[value="Send"]'
-    ).first();
+    // PurplePort uses <a id="replybutton" onclick="sendReply()"> — AJAX, no page navigation
+    const replyBtn = page.locator('a#replybutton');
+    if (await replyBtn.count() === 0) throw new Error('Reply button (a#replybutton) not found on page');
 
-    if (await submitBtn.count() === 0) throw new Error('Submit button not found in form#message');
-
-    const navigationPromise = page.waitForNavigation({ timeout: 20000 }).catch(() => null);
-    await submitBtn.click();
-    await navigationPromise;
+    // Wait for network request after click (AJAX send)
+    const responsePromise = page.waitForResponse(
+      res => res.url().includes('purpleport.com') && res.request().method() === 'POST',
+      { timeout: 15000 }
+    ).catch(() => null);
+    await replyBtn.click();
+    const response = await responsePromise;
+    if (response) {
+      console.log(`[sender] PurplePort AJAX response: ${response.status()} ${response.url()}`);
+    }
     await page.waitForTimeout(3000);
 
     // Verify login not lost
