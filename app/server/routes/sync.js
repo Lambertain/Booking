@@ -1,7 +1,15 @@
 const express = require('express');
-const { one, all } = require('../db');
+const { one, all, query } = require('../db');
 
 const router = express.Router();
+
+function requireSyncSecret(req, res, next) {
+  const secret = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!secret || secret !== process.env.SYNC_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
 
 // POST /api/sync/shoot — called by booking bot on Windows Server
 router.post('/shoot', async (req, res) => {
@@ -94,6 +102,49 @@ router.get('/ai-draft/:msgId', async (req, res) => {
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ai_draft: row.ai_draft });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sync/delivery — log delivery result from booking bot
+router.post('/delivery', requireSyncSecret, async (req, res) => {
+  try {
+    const { modelSlug, modelName, photographer, site, status, error } = req.body;
+    if (!modelSlug || !photographer || !site || !status) {
+      return res.status(400).json({ error: 'modelSlug, photographer, site, status required' });
+    }
+    if (!['sent', 'failed'].includes(status)) {
+      return res.status(400).json({ error: 'status must be sent or failed' });
+    }
+    await query(
+      `INSERT INTO delivery_log (model_slug, model_name, photographer, site, status, error_message)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [modelSlug, modelName || null, photographer, site, status, error || null]
+    );
+    console.log(`[sync/delivery] ${status}: ${photographer} (${site}) → ${modelSlug}`);
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('[sync/delivery] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sync/pipeline — log pipeline scan stats from booking bot
+router.post('/pipeline', requireSyncSecret, async (req, res) => {
+  try {
+    const { modelSlug, modelName, totalSeen, totalQueued, totalUninterested } = req.body;
+    if (!modelSlug) {
+      return res.status(400).json({ error: 'modelSlug required' });
+    }
+    await query(
+      `INSERT INTO pipeline_stats (model_slug, model_name, total_seen, total_queued, total_uninterested)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [modelSlug, modelName || null, totalSeen || 0, totalQueued || 0, totalUninterested || 0]
+    );
+    console.log(`[sync/pipeline] ${modelSlug}: seen=${totalSeen}, queued=${totalQueued}, uninterested=${totalUninterested}`);
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('[sync/pipeline] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -11,6 +11,19 @@ const { sendReply } = require('../extractor/sender');
 const { recordShoot } = require('../airtable/index');
 const db = require('../db/index');
 
+async function syncPipeline(modelSlug, modelName, totalSeen, totalQueued, totalUninterested) {
+  const { APP_API_URL, APP_API_SECRET } = process.env;
+  if (!APP_API_URL || !APP_API_SECRET) return;
+  try {
+    await fetch(`${APP_API_URL}/api/sync/pipeline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${APP_API_SECRET}` },
+      body: JSON.stringify({ modelSlug, modelName, totalSeen, totalQueued, totalUninterested }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {}
+}
+
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 const DATA_DIR = path.resolve(__dirname, '../../data');
 
@@ -316,12 +329,16 @@ async function runPipelineForModel(modelSlug) {
 
   if (newItems.length === 0) {
     console.log(`[pipeline] Немає нових діалогів для ${modelName}`);
+    syncPipeline(modelSlug, modelName, allDialogs.length, 0, 0);
     return;
   }
 
   console.log(`[pipeline] ${newItems.length} діалогів для обробки (${modelName})`);
 
   // 3. Qualify → draft → approve/send
+  let pipelineQueued = 0;
+  let pipelineUninterested = 0;
+
   for (const item of newItems) {
     try {
       // Check if this is an active dialog (we already replied before)
@@ -348,6 +365,7 @@ async function runPipelineForModel(modelSlug) {
             lastIncoming: item.lastIncoming || '',
             msgCount: (item.messages || []).filter(m => m.role === 'interlocutor').length
           });
+          pipelineUninterested++;
           continue;
         }
 
@@ -377,6 +395,7 @@ async function runPipelineForModel(modelSlug) {
       const added = addToQueue(item);
       if (added) {
         console.log(`[pipeline] 📋 Queued: ${item.photographer} (${item.siteLabel}) — ${item.draftType}`);
+        pipelineQueued++;
       } else {
         console.log(`[pipeline] Already in queue: ${item.photographer}`);
       }
@@ -393,6 +412,9 @@ async function runPipelineForModel(modelSlug) {
       console.error(`[pipeline] Error processing ${item.photographer}: ${err.message}`);
     }
   }
+
+  // Sync pipeline stats to Railway
+  syncPipeline(modelSlug, modelName, newItems.length, pipelineQueued, pipelineUninterested);
 }
 
 async function trySendReply(config, item, text) {

@@ -4,11 +4,12 @@ const { requireAuth } = require('../auth');
 
 const router = express.Router();
 
-// GET /api/analytics?period=week&tz=+02:00
+// GET /api/analytics?period=week&tz=+02:00&model=ana-v
 router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
   try {
     const period = req.query.period || 'week'; // day | week | month | year
     const tz = req.query.tz || '+00:00'; // e.g. +02:00
+    const modelFilter = req.query.model && req.query.model !== 'all' ? req.query.model : null;
 
     // Parse UTC offset in minutes so we can compute correct local day boundaries
     const tzMatch = tz.match(/([+-])(\d{2}):(\d{2})/);
@@ -51,6 +52,10 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
       to   = localToUtc(ly, lm, ld, 23, 59, 59, 999);
     }
 
+    const fromIso = from.toISOString();
+    const toIso   = to.toISOString();
+
+    // --- АПКА analytics (unchanged) ---
     const rows = await all(`
       SELECT
         date_trunc($1, created_at AT TIME ZONE $4) AS bucket,
@@ -64,7 +69,7 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         AND ai_draft IS NOT NULL
       GROUP BY bucket
       ORDER BY bucket
-    `, [trunc, from.toISOString(), to.toISOString(), tz]);
+    `, [trunc, fromIso, toIso, tz]);
 
     // Summary totals for the period
     const totals = await one(`
@@ -77,12 +82,66 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
       FROM messages
       WHERE created_at >= $1 AND created_at <= $2
         AND ai_draft IS NOT NULL
-    `, [from.toISOString(), to.toISOString()]);
+    `, [fromIso, toIso]);
+
+    // --- Delivery stats from booking bot ---
+    // Build model filter clause
+    const deliveryParams = [fromIso, toIso];
+    let deliveryModelClause = '';
+    if (modelFilter) {
+      deliveryParams.push(modelFilter);
+      deliveryModelClause = ` AND model_slug = $${deliveryParams.length}`;
+    }
+
+    const deliverySummary = await one(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'sent')   AS sent,
+        COUNT(*) FILTER (WHERE status = 'failed') AS failed
+      FROM delivery_log
+      WHERE created_at >= $1 AND created_at <= $2${deliveryModelClause}
+    `, deliveryParams);
+
+    const errorParams = [...deliveryParams];
+    const deliveryErrors = await all(`
+      SELECT photographer, site, model_name, error_message, created_at
+      FROM delivery_log
+      WHERE status = 'failed'
+        AND created_at >= $1 AND created_at <= $2${deliveryModelClause}
+      ORDER BY created_at DESC
+      LIMIT 10
+    `, errorParams);
+
+    // --- Pipeline stats from booking bot ---
+    const pipelineParams = [fromIso, toIso];
+    let pipelineModelClause = '';
+    if (modelFilter) {
+      pipelineParams.push(modelFilter);
+      pipelineModelClause = ` AND model_slug = $${pipelineParams.length}`;
+    }
+
+    const pipelineSummary = await one(`
+      SELECT
+        COALESCE(SUM(total_seen), 0)          AS total_seen,
+        COALESCE(SUM(total_queued), 0)        AS total_queued,
+        COALESCE(SUM(total_uninterested), 0)  AS total_uninterested
+      FROM pipeline_stats
+      WHERE created_at >= $1 AND created_at <= $2${pipelineModelClause}
+    `, pipelineParams);
+
+    // --- Models list (distinct slugs from both tables) ---
+    const modelRows = await all(`
+      SELECT DISTINCT model_slug FROM (
+        SELECT model_slug FROM delivery_log WHERE model_slug IS NOT NULL
+        UNION
+        SELECT model_slug FROM pipeline_stats WHERE model_slug IS NOT NULL
+      ) t
+      ORDER BY model_slug
+    `, []);
 
     res.json({
       period,
-      from: from.toISOString(),
-      to: to.toISOString(),
+      from: fromIso,
+      to:   toIso,
       totals: {
         processed: parseInt(totals?.processed || 0),
         approved:  parseInt(totals?.approved  || 0),
@@ -98,6 +157,23 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
         skipped:   parseInt(r.skipped   || 0),
         pending:   parseInt(r.pending   || 0),
       })),
+      delivery: {
+        sent:   parseInt(deliverySummary?.sent   || 0),
+        failed: parseInt(deliverySummary?.failed || 0),
+        errors: deliveryErrors.map(e => ({
+          photographer:  e.photographer,
+          site:          e.site,
+          model_name:    e.model_name,
+          error_message: e.error_message,
+          created_at:    e.created_at,
+        })),
+      },
+      pipeline: {
+        total_seen:          parseInt(pipelineSummary?.total_seen         || 0),
+        total_queued:        parseInt(pipelineSummary?.total_queued       || 0),
+        total_uninterested:  parseInt(pipelineSummary?.total_uninterested || 0),
+      },
+      models: modelRows.map(r => r.model_slug),
     });
   } catch (err) {
     console.error('[analytics]', err.message);

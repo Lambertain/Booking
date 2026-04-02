@@ -307,6 +307,12 @@ export default {
     totalApproved: 'Approved',
     totalEdited: 'Edited',
     totalSkipped: 'Skipped',
+    botDelivery: 'Sent by manager',
+    sent: 'Sent',
+    errors: 'Errors',
+    seen: 'Checked',
+    queued: 'Queued',
+    lastErrors: '⚠️ Last delivery errors:',
   },
 
   settings: {

@@ -313,6 +313,12 @@ export default {
     totalApproved: 'Відправлено',
     totalEdited: 'Відредаговано',
     totalSkipped: 'Пропущено',
+    botDelivery: 'Відправлено менеджером',
+    sent: 'Надіслано',
+    errors: 'Помилки',
+    seen: 'Перевірено',
+    queued: 'В черзі',
+    lastErrors: '⚠️ Останні помилки доставки:',
   },
 
   settings: {

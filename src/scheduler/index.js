@@ -5,6 +5,19 @@ const { peekSendNext, removeSendFirst, updateSendFirst, sendQueueLength } = requ
 const { sendReply } = require('../extractor/sender');
 
 const MODELS_DIR = path.resolve(__dirname, '../../models');
+
+async function syncDelivery(modelSlug, photographer, site, status, errorMsg) {
+  const { APP_API_URL, APP_API_SECRET } = process.env;
+  if (!APP_API_URL || !APP_API_SECRET) return;
+  try {
+    await fetch(`${APP_API_URL}/api/sync/delivery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${APP_API_SECRET}` },
+      body: JSON.stringify({ modelSlug, photographer, site, status, error: errorMsg || null }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {}
+}
 const SCAN_INTERVAL = parseInt(process.env.SCAN_INTERVAL_MIN || '15', 10) * 60 * 1000;
 
 function getModelSlugs() {
@@ -49,6 +62,7 @@ async function processSendQueue() {
     console.log(`[scheduler] ✅ Надіслано: ${toSend.photographer} (${toSend.site})`);
     const { onDeliveryResult } = require('../bot/index');
     onDeliveryResult(true, toSend.photographer, toSend.site, null, toSend.url);
+    syncDelivery(toSend.modelSlug, toSend.photographer, toSend.site, 'sent', null);
   } catch (err) {
     console.error(`[scheduler] ❌ Помилка відправки ${toSend.photographer}: ${err.message}`);
 
@@ -68,6 +82,7 @@ async function processSendQueue() {
         console.error(`[scheduler] ❌ ${crashCount} browser crashes — giving up on this item`);
         const { onDeliveryResult } = require('../bot/index');
         onDeliveryResult(false, toSend.photographer, toSend.site, `Browser crashed ${crashCount} times: ${err.message}`);
+        syncDelivery(toSend.modelSlug, toSend.photographer, toSend.site, 'failed', `Browser crashed ${crashCount} times: ${err.message}`);
         sendPaused = true;
         return;
       }
@@ -100,6 +115,7 @@ async function processSendQueue() {
     } else {
       const { onDeliveryResult } = require('../bot/index');
       onDeliveryResult(false, toSend.photographer, toSend.site, err.message);
+      syncDelivery(toSend.modelSlug, toSend.photographer, toSend.site, 'failed', err.message);
       sendPaused = true; // Item stays in queue, manual resume required
     }
   }

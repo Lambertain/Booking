@@ -28,6 +28,12 @@ function formatBucket(bucket, period) {
   return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
 }
 
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 // Pure SVG chart — no external libraries
 function Chart({ data, period, chartType }) {
   const W = 340, H = 180, PAD = { top: 12, right: 8, bottom: 28, left: 32 };
@@ -137,23 +143,25 @@ export default function AnalyticsScreen() {
   const { t } = useLang();
   const [period, setPeriod] = useState('week');
   const [chartType, setChartType] = useState('bar');
+  const [model, setModel] = useState('all');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    // Convert IANA timezone to UTC offset for the query
     const offset = -new Date().getTimezoneOffset();
     const sign = offset >= 0 ? '+' : '-';
     const h = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
     const m = String(Math.abs(offset) % 60).padStart(2, '0');
     const tzParam = `${sign}${h}:${m}`;
 
-    api.get(`/api/analytics?period=${period}&tz=${encodeURIComponent(tzParam)}`)
+    let url = `/api/analytics?period=${period}&tz=${encodeURIComponent(tzParam)}`;
+    if (model && model !== 'all') url += `&model=${encodeURIComponent(model)}`;
+
+    api.get(url)
       .then(setData)
       .finally(() => setLoading(false));
-  }, [period]);
+  }, [period, model]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -163,20 +171,41 @@ export default function AnalyticsScreen() {
     { key: 'line', label: t('analytics.line') },
   ];
 
+  const models = data?.models || [];
+  const modelOptions = ['all', ...models];
+
+  const btnStyle = (active) => ({
+    flex: 1, padding: '7px 4px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+    border: 'none', cursor: 'pointer',
+    background: active ? 'var(--accent)' : 'var(--bg2)',
+    color: active ? '#fff' : 'var(--text2)',
+  });
+
   return (
     <div className="screen">
       <TopBar title={t('analytics.title')} />
       <div style={{ paddingTop: 'var(--topbar-h)', padding: 'calc(var(--topbar-h) + 12px) 16px 24px' }}>
 
+        {/* Model selector */}
+        {modelOptions.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {modelOptions.map(m => (
+              <button key={m} onClick={() => setModel(m)} style={{
+                padding: '6px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
+                border: 'none', cursor: 'pointer',
+                background: model === m ? 'var(--accent)' : 'var(--bg2)',
+                color: model === m ? '#fff' : 'var(--text2)',
+              }}>
+                {m === 'all' ? t('all') : m}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Period toggles */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           {periods.map(p => (
-            <button key={p} onClick={() => setPeriod(p)} style={{
-              flex: 1, padding: '7px 4px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-              border: 'none', cursor: 'pointer',
-              background: period === p ? 'var(--accent)' : 'var(--bg2)',
-              color: period === p ? '#fff' : 'var(--text2)',
-            }}>
+            <button key={p} onClick={() => setPeriod(p)} style={btnStyle(period === p)}>
               {t(`analytics.${p}`)}
             </button>
           ))}
@@ -186,7 +215,7 @@ export default function AnalyticsScreen() {
           <div className="loader"><div className="spinner" /></div>
         ) : !data ? null : (
           <>
-            {/* Summary cards */}
+            {/* Summary cards — АПКА */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               <StatCard label={t('analytics.totalProcessed')} value={data.totals.processed} color="var(--accent)" />
               <StatCard label={t('analytics.totalApproved')}  value={data.totals.approved}  color="#34c759" />
@@ -194,8 +223,8 @@ export default function AnalyticsScreen() {
               <StatCard label={t('analytics.totalSkipped')}   value={data.totals.skipped}   color="#ff3b30" />
             </div>
 
-            {/* Chart card */}
-            <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: '16px 12px 12px' }}>
+            {/* Chart card — АПКА */}
+            <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: '16px 12px 12px', marginBottom: 16 }}>
               {/* Chart type toggle */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
                 {chartTypes.map(({ key, label }) => (
@@ -227,6 +256,43 @@ export default function AnalyticsScreen() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Delivery stats card — booking bot */}
+            <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: '16px 12px 12px', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 12 }}>
+                {t('analytics.botDelivery')}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <StatCard label={t('analytics.sent')}      value={data.delivery.sent}             color="#34c759" />
+                <StatCard label={t('analytics.errors')}    value={data.delivery.failed}            color="#ff3b30" />
+                <StatCard label={t('analytics.seen')}      value={data.pipeline.total_seen}        color="var(--accent)" />
+                <StatCard label={t('analytics.queued')}    value={data.pipeline.total_queued}      color="#ff9f0a" />
+              </div>
+
+              {/* Error log */}
+              {data.delivery.errors.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, color: '#ff3b30', fontWeight: 600, marginBottom: 6 }}>
+                    {t('analytics.lastErrors')}
+                  </div>
+                  {data.delivery.errors.slice(0, 5).map((e, i) => (
+                    <div key={i} style={{
+                      fontSize: 11, color: 'var(--text3)', padding: '4px 0',
+                      borderBottom: '1px solid var(--separator)',
+                    }}>
+                      <span style={{ color: 'var(--text2)', fontWeight: 500 }}>
+                        {e.photographer}
+                      </span>
+                      {' '}({e.site}{e.model_name ? `, ${e.model_name}` : ''})
+                      {e.error_message ? ` — ${e.error_message}` : ''}
+                      <span style={{ color: 'var(--text3)', marginLeft: 6 }}>
+                        {formatTime(e.created_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}

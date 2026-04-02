@@ -79,6 +79,15 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
     await page.locator(rf.submitSelector).click();
     await page.waitForTimeout(6000);
 
+    // Reload page and check if our text appears in the conversation
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(2000);
+    const sent = await page.evaluate((msg) => {
+      const texts = [...document.querySelectorAll('[id^="message-content-"]')].map(el => el.innerText || '');
+      return texts.some(t => t.includes(msg.slice(0, 30)));
+    }, message);
+    if (!sent) throw new Error('Повідомлення не знайдено в розмові після відправки (adultfolio)');
+
     return { ok: true, url };
   } finally {
     await session.close();
@@ -138,6 +147,16 @@ async function sendModelKarteiReply(profileId, siteConfig, url, message, mediaFi
     if (await sendBtn.count() === 0) throw new Error('Send button not found');
     await sendBtn.click();
     await page.waitForTimeout(5000);
+
+    // Reload page and verify message appears in conversation
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(2000);
+    const sent = await page.evaluate((msg) => {
+      // Model-Kartei: self messages have class sedcard1
+      const selfMsgs = [...document.querySelectorAll('.sedcard1')].map(el => el.innerText || '');
+      return selfMsgs.some(t => t.includes(msg.slice(0, 30)));
+    }, message);
+    if (!sent) throw new Error('Повідомлення не знайдено в розмові після відправки (model-kartei)');
 
     return { ok: true, url };
   } finally {
