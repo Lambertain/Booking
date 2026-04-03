@@ -343,7 +343,9 @@ async function runPipelineForModel(modelSlug) {
     try {
       // Check if this is an active dialog (we already replied before)
       const existing = db.getDialog(item.site, item.url);
-      const isActive = existing && (existing.status === 'sent' || existing.status === 'queued');
+      // Only skip qualification if status='sent' (we sent a reply, photographer wrote back — definitely relevant)
+      // For status='queued' (we never sent), re-run qualification — content may be a rejection/stale
+      const isActive = existing && existing.status === 'sent';
 
       if (isActive) {
         // Active dialog — skip Grok qualification, go straight to draft
