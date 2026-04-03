@@ -60,74 +60,82 @@ async function apkaDeliver(msgId, text) {
 function onDeliveryResult(success, photographer, site, error, url) {
   if (success) {
     bot.api.sendMessage(CHAT_ID, `✅ Відповідь доставлена: ${photographer} (${site})`).catch(() => {});
-    // Update DB: dialog is now 'sent' (awaiting photographer's response)
     if (url) db.updateStatus(site, url, 'sent');
     waitingForDelivery = false;
-    // Queue processor will pick next in 10s
+    // Show next card immediately after delivery
+    setTimeout(() => tryShowNextCard(), 3000);
   } else {
     bot.api.sendMessage(CHAT_ID, `❌ Не вдалося доставити: ${photographer} (${site})\nПомилка: ${error}\n\nВідправку призупинено. Напишіть "resume" щоб відновити.`).catch(() => {});
-    // Keep waitingForDelivery = true — blocks queue
+    // Keep waitingForDelivery = true — blocks queue until manual "resume"
   }
 }
 
-// --- Queue processor: check every 10s ---
-function startQueueProcessor() {
-  setInterval(async () => {
-    if (currentApproval || queueLock || waitingForDelivery) return;
-    const len = queueLength();
-    if (len === 0) return;
+// --- Show next card from queue (event-driven) ---
+async function tryShowNextCard() {
+  if (currentApproval || queueLock || waitingForDelivery) return;
+  const len = queueLength();
+  if (len === 0) return;
 
-    queueLock = true;
-    const item = takeNext();
-    if (!item) { queueLock = false; return; }
+  queueLock = true;
+  const item = takeNext();
+  if (!item) { queueLock = false; return; }
 
-    // Skip stale items: already sent with same message, or still queued but in send queue
-    const existing = db.getDialog(item.site, item.url);
-    if (existing && existing.last_incoming === item.lastIncoming) {
-      if (existing.status === 'sent') {
-        console.log(`[bot] Пропускаю вже відправлений: ${item.photographer} (${item.siteLabel})`);
+  // Skip stale items: already sent with same message, or still in send queue
+  const existing = db.getDialog(item.site, item.url);
+  if (existing && existing.last_incoming === item.lastIncoming) {
+    if (existing.status === 'sent') {
+      console.log(`[bot] Пропускаю вже відправлений: ${item.photographer} (${item.siteLabel})`);
+      queueLock = false;
+      setTimeout(() => tryShowNextCard(), 500);
+      return;
+    }
+    if (existing.status === 'queued') {
+      const { loadSendQueue } = require('../pipeline/send-queue');
+      if (loadSendQueue().some(q => q.site === item.site && q.url === item.url)) {
+        console.log(`[bot] Пропускаю — вже у черзі відправки: ${item.photographer} (${item.siteLabel})`);
         queueLock = false;
+        setTimeout(() => tryShowNextCard(), 500);
         return;
       }
-      if (existing.status === 'queued') {
-        const { loadSendQueue } = require('../pipeline/send-queue');
-        if (loadSendQueue().some(q => q.site === item.site && q.url === item.url)) {
-          console.log(`[bot] Пропускаю — вже у черзі відправки: ${item.photographer} (${item.siteLabel})`);
-          queueLock = false;
-          return;
-        }
-      }
     }
+  }
 
-    currentApproval = item;
-    currentApproval.approvalId = `${item.site}-${Date.now()}`;
-    waitingForEdit = false;
-    editMediaFiles = [];
-    queueLock = false;
+  currentApproval = item;
+  currentApproval.approvalId = `${item.site}-${Date.now()}`;
+  waitingForEdit = false;
+  editMediaFiles = [];
+  queueLock = false;
 
-    console.log(`[bot] Надсилаю на апрув: ${item.photographer} (${item.siteLabel}). Черга: ${len - 1}`);
+  console.log(`[bot] Надсилаю на апрув: ${item.photographer} (${item.siteLabel}). Черга: ${len - 1}`);
 
-    const text = formatApprovalCard(item);
-    const keyboard = buildApprovalKeyboard(item.approvalId);
+  const text = formatApprovalCard(item);
+  const keyboard = buildApprovalKeyboard(item.approvalId);
 
+  try {
+    await bot.api.sendMessage(CHAT_ID, text, { parse_mode: 'MarkdownV2', reply_markup: keyboard });
+  } catch {
     try {
-      await bot.api.sendMessage(CHAT_ID, text, { parse_mode: 'MarkdownV2', reply_markup: keyboard });
-    } catch {
-      try {
-        const plain = `📸 ${item.photographer} | ${item.siteLabel} | ${item.model}\n\n💬 INCOMING:\n${item.lastIncoming}\n\n✏️ DRAFT:\n${item.draft}`;
-        await bot.api.sendMessage(CHAT_ID, plain, { reply_markup: keyboard });
-      } catch (err2) {
-        console.error('Failed to send card:', err2.message);
-        currentApproval = null;
-      }
+      const plain = `📸 ${item.photographer} | ${item.siteLabel} | ${item.model}\n\n💬 INCOMING:\n${item.lastIncoming}\n\n✏️ DRAFT:\n${item.draft}`;
+      await bot.api.sendMessage(CHAT_ID, plain, { reply_markup: keyboard });
+    } catch (err2) {
+      console.error('Failed to send card:', err2.message);
+      currentApproval = null;
     }
+  }
 
-    // Send photographer photos
-    const images = collectPhotographerImages(item.messages);
-    for (const url of images.slice(0, 5)) {
-      try { await bot.api.sendPhoto(CHAT_ID, url, { caption: `📷 Фото від ${item.photographer}` }); } catch {}
-    }
-  }, 10000);
+  // Send photographer photos
+  const images = collectPhotographerImages(item.messages);
+  for (const url of images.slice(0, 5)) {
+    try { await bot.api.sendPhoto(CHAT_ID, url, { caption: `📷 Фото від ${item.photographer}` }); } catch {}
+  }
+}
+
+// --- Queue processor: safety net only (60s), main flow is event-driven ---
+function startQueueProcessor() {
+  // Initial card on startup
+  setTimeout(() => tryShowNextCard(), 5000);
+  // Safety net: if something got stuck, retry every 60s
+  setInterval(() => tryShowNextCard(), 60000);
 }
 
 // --- Handle approval ---
@@ -238,6 +246,8 @@ async function handleApprovalResult(action, text) {
     currentApproval = null;
     waitingForEdit = false;
     editMediaFiles = [];
+    // Show next card immediately after skip
+    setTimeout(() => tryShowNextCard(), 500);
   }
 }
 
@@ -338,6 +348,7 @@ bot.on('message:text', async (ctx) => {
       if (sched.resumeSending) sched.resumeSending();
       waitingForDelivery = false;
       await ctx.reply('▶️ Відправку відновлено');
+      setTimeout(() => tryShowNextCard(), 1000);
     } catch {}
     return;
   }
