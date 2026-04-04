@@ -314,6 +314,7 @@ export default {
     errors: 'Ошибки',
     lastErrors: 'Последние ошибки',
     allModels: 'Все модели',
+    approvedOnly: 'Апрувнуто',
     failed: 'Ошибка',
   },
 

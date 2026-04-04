@@ -314,6 +314,7 @@ export default {
     errors: 'Errors',
     lastErrors: 'Last errors',
     allModels: 'All models',
+    approvedOnly: 'Approved',
     failed: 'Failed',
   },
 

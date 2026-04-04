@@ -57,21 +57,33 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
     const baseParams = modelFilter ? [fromIso, toIso, modelFilter] : [fromIso, toIso];
 
     // --- Pipeline totals: seen, uninterested ---
+    // Use SUM for seen/queued, but MAX per model for uninterested to avoid
+    // counting the same rejected dialogs multiple times across repeated scans
     const pipelineTotals = await one(`
       SELECT
-        COALESCE(SUM(total_seen), 0)         AS seen,
-        COALESCE(SUM(total_queued), 0)       AS queued,
-        COALESCE(SUM(total_uninterested), 0) AS uninterested
+        COALESCE(SUM(total_seen), 0)   AS seen,
+        COALESCE(SUM(total_queued), 0) AS queued
       FROM pipeline_stats
       WHERE created_at >= $1 AND created_at <= $2${modelClause}
     `, baseParams);
 
-    // --- Delivery totals: sent, edited, failed ---
+    const skippedRow = await one(`
+      SELECT COALESCE(SUM(max_uninterested), 0) AS uninterested
+      FROM (
+        SELECT model_slug, MAX(total_uninterested) AS max_uninterested
+        FROM pipeline_stats
+        WHERE created_at >= $1 AND created_at <= $2${modelClause}
+        GROUP BY model_slug
+      ) t
+    `, baseParams);
+
+    // --- Delivery totals: sent, approved, edited, failed ---
     const deliveryTotals = await one(`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'sent')                      AS sent,
-        COUNT(*) FILTER (WHERE status = 'sent' AND action = 'edited') AS edited,
-        COUNT(*) FILTER (WHERE status = 'failed')                    AS failed
+        COUNT(*) FILTER (WHERE status = 'sent')                                         AS sent,
+        COUNT(*) FILTER (WHERE status = 'sent' AND (action = 'approved' OR action IS NULL)) AS approved,
+        COUNT(*) FILTER (WHERE status = 'sent' AND action = 'edited')                   AS edited,
+        COUNT(*) FILTER (WHERE status = 'failed')                                       AS failed
       FROM delivery_log
       WHERE created_at >= $1 AND created_at <= $2${modelClause}
     `, baseParams);
@@ -118,13 +130,15 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
       totals: {
         seen:     parseInt(pipelineTotals?.seen     || 0),
         sent:     parseInt(deliveryTotals?.sent     || 0),
+        approved: parseInt(deliveryTotals?.approved || 0),
         edited:   parseInt(deliveryTotals?.edited   || 0),
-        skipped:  parseInt(pipelineTotals?.uninterested || 0),
+        skipped:  parseInt(skippedRow?.uninterested || 0),
         errors:   parseInt(deliveryTotals?.failed   || 0),
       },
+      // In chart, sent = approved-only so bars stack correctly (edited is a subset of sent)
       chart: chartRows.map(r => ({
         bucket: r.bucket,
-        sent:   parseInt(r.sent   || 0),
+        sent:   Math.max(0, parseInt(r.sent || 0) - parseInt(r.edited || 0)),
         edited: parseInt(r.edited || 0),
         failed: parseInt(r.failed || 0),
       })),

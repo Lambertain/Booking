@@ -318,6 +318,8 @@ export default {
     errors: 'Помилки',
     seen: 'Перевірено',
     queued: 'В черзі',
+    approvedOnly: 'Апрувнуто',
+    failed: 'Помилка',
     lastErrors: '⚠️ Останні помилки доставки:',
   },
 

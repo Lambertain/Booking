@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api.js';
 import { useLang } from '../i18n/useLang.js';
 
+// In chart data, 'sent' = approved-only (non-edited), 'edited' = edited
 const SERIES = [
-  { key: 'sent',   color: '#34c759' },
-  { key: 'edited', color: '#ff9f0a' },
-  { key: 'failed', color: '#ff3b30' },
+  { key: 'sent',   color: '#34c759', i18nKey: 'approvedOnly' },
+  { key: 'edited', color: '#ff9f0a', i18nKey: 'edited' },
+  { key: 'failed', color: '#ff3b30', i18nKey: 'failed' },
 ];
 
 function formatBucket(bucket, period) {
@@ -174,13 +175,14 @@ export default function AnalyticsScreen() {
       ) : !data ? null : (
         <div style={{ padding: '0 16px' }}>
 
-          {/* 5 stat cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 16 }}>
-            <StatCard label={t('analytics.seen')}    value={data.totals.seen}    color="var(--accent)" />
-            <StatCard label={t('analytics.sent')}    value={data.totals.sent}    color="#34c759" />
-            <StatCard label={t('analytics.edited')}  value={data.totals.edited}  color="#ff9f0a" />
-            <StatCard label={t('analytics.skipped')} value={data.totals.skipped} color="#636366" />
-            <StatCard label={t('analytics.errors')}  value={data.totals.errors}  color="#ff3b30" />
+          {/* 6 stat cards: 3+3 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 16 }}>
+            <StatCard label={t('analytics.seen')}        value={data.totals.seen}     color="var(--accent)" />
+            <StatCard label={t('analytics.sent')}        value={data.totals.sent}     color="#34c759" />
+            <StatCard label={t('analytics.approvedOnly')} value={data.totals.approved} color="#30d158" />
+            <StatCard label={t('analytics.edited')}      value={data.totals.edited}   color="#ff9f0a" />
+            <StatCard label={t('analytics.skipped')}     value={data.totals.skipped}  color="#636366" />
+            <StatCard label={t('analytics.errors')}      value={data.totals.errors}   color="#ff3b30" />
           </div>
 
           {/* Chart */}
@@ -207,10 +209,10 @@ export default function AnalyticsScreen() {
             )}
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, justifyContent: 'center' }}>
-              {SERIES.map(({ key, color }) => (
+              {SERIES.map(({ key, color, i18nKey }) => (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text2)' }}>
                   <div style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
-                  {t(`analytics.${key}`)}
+                  {t(`analytics.${i18nKey}`)}
                 </div>
               ))}
             </div>
