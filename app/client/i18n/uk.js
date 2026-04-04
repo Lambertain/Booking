@@ -196,6 +196,14 @@ export default {
     send: '📣 Надіслати {count} отримувачам',
     sentResult: '✅ Відправляється {count} повідомлень',
     tooltip: 'Розсилка',
+    templates: 'Шаблони повідомлень:',
+    noTpls: 'Шаблонів немає',
+    newTpl: 'Новий шаблон',
+    saveAsTpl: 'Зберегти як шаблон',
+    tplNamePh: 'Назва шаблону...',
+    tplTextPh: 'Текст шаблону...',
+    tplTagsHint: 'Теги за замовчуванням (необов\'язково):',
+    deleteTplConfirm: 'Видалити шаблон?',
   },
 
   clients: {

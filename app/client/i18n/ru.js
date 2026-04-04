@@ -190,6 +190,14 @@ export default {
     send: '📣 Отправить {count} получателям',
     sentResult: '✅ Отправляется {count} сообщений',
     tooltip: 'Рассылка',
+    templates: 'Шаблоны сообщений:',
+    noTpls: 'Шаблонов нет',
+    newTpl: 'Новый шаблон',
+    saveAsTpl: 'Сохранить как шаблон',
+    tplNamePh: 'Название шаблона...',
+    tplTextPh: 'Текст шаблона...',
+    tplTagsHint: 'Теги по умолчанию (необязательно):',
+    deleteTplConfirm: 'Удалить шаблон?',
   },
 
   clients: {

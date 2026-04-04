@@ -1,6 +1,6 @@
 const express = require('express');
 const https = require('https');
-const { all, query } = require('../db');
+const { all, one, query } = require('../db');
 const { requireAuth } = require('../auth');
 
 const router = express.Router();
@@ -200,6 +200,70 @@ router.post('/', requireAuth('admin', 'manager'), async (req, res) => {
     }
     console.log(`[broadcast] Sent ${sent}/${subscribers.length}, failed: ${failed}`);
   });
+});
+
+// --- Broadcast templates (saved messages) ---
+
+// GET /api/broadcast/message-templates
+router.get('/message-templates', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const rows = await all(
+      `SELECT bt.*, u.name as created_by_name
+       FROM broadcast_templates bt
+       LEFT JOIN users u ON u.id = bt.created_by
+       ORDER BY bt.created_at DESC`,
+      []
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/broadcast/message-templates
+router.post('/message-templates', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const { name, text, tags } = req.body;
+    if (!name?.trim() || !text?.trim()) return res.status(400).json({ error: 'name and text required' });
+    const row = await one(
+      `INSERT INTO broadcast_templates (name, text, tags, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [name.trim(), text.trim(), tags || [], req.user.id]
+    );
+    res.status(201).json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/broadcast/message-templates/:id
+router.patch('/message-templates/:id', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const { name, text, tags } = req.body;
+    const updates = [], vals = [];
+    let i = 1;
+    if (name !== undefined) { updates.push(`name = $${i++}`); vals.push(name.trim()); }
+    if (text !== undefined) { updates.push(`text = $${i++}`); vals.push(text.trim()); }
+    if (tags !== undefined) { updates.push(`tags = $${i++}`); vals.push(tags); }
+    if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.id);
+    const row = await one(
+      `UPDATE broadcast_templates SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
+      vals
+    );
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/broadcast/message-templates/:id
+router.delete('/message-templates/:id', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    await query(`DELETE FROM broadcast_templates WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

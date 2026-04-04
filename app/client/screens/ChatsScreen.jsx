@@ -15,6 +15,15 @@ function BroadcastSheet({ open, onClose }) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
 
+  // Template state
+  const [templates, setTemplates] = useState([]);
+  const [showSaveForm, setShowSaveForm] = useState(false); // save current text
+  const [showCreateForm, setShowCreateForm] = useState(false); // create from scratch
+  const [saveName, setSaveName] = useState('');
+  const [saveText, setSaveText] = useState('');
+  const [saveTags, setSaveTags] = useState([]);
+  const [savingTpl, setSavingTpl] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     setResult(null);
@@ -23,6 +32,7 @@ function BroadcastSheet({ open, onClose }) {
       setAllTotal(d.total || 0);
       setCount(d.total || 0);
     });
+    api.get('/api/broadcast/message-templates').then(setTemplates).catch(() => {});
   }, [open]);
 
   async function updateCount(newTags) {
@@ -53,23 +63,135 @@ function BroadcastSheet({ open, onClose }) {
     }
   }
 
+  async function saveTemplate(nameVal, textVal, tagsVal) {
+    if (!nameVal?.trim() || !textVal?.trim()) return;
+    setSavingTpl(true);
+    try {
+      const tpl = await api.post('/api/broadcast/message-templates', {
+        name: nameVal.trim(), text: textVal.trim(), tags: tagsVal || [],
+      });
+      setTemplates(prev => [tpl, ...prev]);
+      setSaveName(''); setSaveText(''); setSaveTags([]);
+      setShowSaveForm(false); setShowCreateForm(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSavingTpl(false);
+    }
+  }
+
+  function toggleSaveTag(tag) {
+    setSaveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  }
+
+  async function deleteTemplate(id, e) {
+    e.stopPropagation();
+    if (!confirm(t('broadcast.deleteTplConfirm'))) return;
+    await api.delete(`/api/broadcast/message-templates/${id}`).catch(() => {});
+    setTemplates(prev => prev.filter(tp => tp.id !== id));
+  }
+
   return (
     <Sheet open={open} onClose={onClose} title={t('broadcast.title')}>
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
-          {t('broadcast.tagsHint')}
+
+      {/* Templates picker */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: 'var(--text3)' }}>{t('broadcast.templates')}</div>
+          <button onClick={() => { setShowCreateForm(true); setShowSaveForm(false); setSaveName(''); setSaveText(''); }}
+            style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            + {t('broadcast.newTpl')}
+          </button>
         </div>
+        {templates.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {templates.map(tp => (
+              <div key={tp.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <button
+                  onClick={() => {
+                    setText(tp.text);
+                    if (tp.tags?.length) {
+                      setSelectedTags(tp.tags);
+                      updateCount(tp.tags);
+                    }
+                  }}
+                  title={tp.text}
+                  style={{
+                    padding: '4px 10px', borderRadius: 12, fontSize: 12, cursor: 'pointer',
+                    border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text1)',
+                  }}
+                >
+                  {tp.name}{tp.tags?.length ? ` (${tp.tags.join(', ')})` : ''}
+                </button>
+                <button onClick={e => deleteTemplate(tp.id, e)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {templates.length === 0 && !showCreateForm && (
+          <div style={{ fontSize: 12, color: 'var(--text3)' }}>{t('broadcast.noTpls')}</div>
+        )}
+
+        {/* Create template from scratch */}
+        {showCreateForm && (
+          <div style={{ marginTop: 8, padding: '10px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>{t('broadcast.newTpl')}</div>
+            <input
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              placeholder={t('broadcast.tplNamePh')}
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text1)', fontSize: 13, marginBottom: 6, boxSizing: 'border-box' }}
+            />
+            <textarea
+              value={saveText}
+              onChange={e => setSaveText(e.target.value)}
+              placeholder={t('broadcast.tplTextPh')}
+              rows={4}
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text1)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', marginBottom: 6 }}
+            />
+            {tags.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>{t('broadcast.tplTagsHint')}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {tags.map(({ tag }) => (
+                    <button key={tag} onClick={() => toggleSaveTag(tag)} style={{
+                      padding: '3px 8px', borderRadius: 10, fontSize: 11, cursor: 'pointer',
+                      border: '1px solid var(--border)',
+                      background: saveTags.includes(tag) ? 'var(--accent)' : 'var(--bg3)',
+                      color: saveTags.includes(tag) ? '#fff' : 'var(--text2)',
+                    }}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-primary" onClick={() => saveTemplate(saveName, saveText, saveTags)}
+                disabled={!saveName.trim() || !saveText.trim() || savingTpl} style={{ flex: 1 }}>
+                {savingTpl ? '…' : t('save')}
+              </button>
+              <button className="btn btn-secondary" onClick={() => { setShowCreateForm(false); setSaveName(''); setSaveText(''); setSaveTags([]); }}>
+                {t('cancel')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Tags */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>{t('broadcast.tagsHint')}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {tags.map(({ tag, count: tc }) => (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              style={{
-                padding: '4px 10px', borderRadius: 12, fontSize: 12, cursor: 'pointer', border: '1px solid var(--border)',
-                background: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--bg3)',
-                color: selectedTags.includes(tag) ? '#fff' : 'var(--text1)',
-              }}
-            >
+            <button key={tag} onClick={() => toggleTag(tag)} style={{
+              padding: '4px 10px', borderRadius: 12, fontSize: 12, cursor: 'pointer', border: '1px solid var(--border)',
+              background: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--bg3)',
+              color: selectedTags.includes(tag) ? '#fff' : 'var(--text1)',
+            }}>
               {tag} ({tc})
             </button>
           ))}
@@ -81,7 +203,16 @@ function BroadcastSheet({ open, onClose }) {
       </div>
 
       <div className="input-group">
-        <div className="input-label">{t('broadcast.messageLabel')}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <div className="input-label" style={{ marginBottom: 0 }}>{t('broadcast.messageLabel')}</div>
+          {text.trim() && !showSaveForm && (
+            <button onClick={() => setShowSaveForm(true)} style={{
+              fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            }}>
+              + {t('broadcast.saveAsTpl')}
+            </button>
+          )}
+        </div>
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
@@ -90,6 +221,24 @@ function BroadcastSheet({ open, onClose }) {
           style={{ resize: 'vertical' }}
         />
       </div>
+
+      {/* Save current text as template */}
+      {showSaveForm && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <input
+            value={saveName}
+            onChange={e => setSaveName(e.target.value)}
+            placeholder={t('broadcast.tplNamePh')}
+            style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text1)', fontSize: 13 }}
+            onKeyDown={e => e.key === 'Enter' && saveTemplate(saveName, text.trim(), selectedTags)}
+          />
+          <button className="btn btn-primary" onClick={() => saveTemplate(saveName, text.trim(), selectedTags)}
+            disabled={!saveName.trim() || savingTpl} style={{ whiteSpace: 'nowrap' }}>
+            {savingTpl ? '…' : t('save')}
+          </button>
+          <button className="btn btn-secondary" onClick={() => { setShowSaveForm(false); setSaveName(''); }}>✕</button>
+        </div>
+      )}
 
       {result && (
         <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg3)', fontSize: 13, marginBottom: 8 }}>
