@@ -248,11 +248,13 @@ function ChatThread({ conv, user, onBack }) {
         const media = await api.post('/api/media/upload', {
           data: base64, mimeType: file.type, fileName: file.name
         });
+        const mediaType = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'file';
         const msg = await api.post(`/api/conversations/${conv.id}/messages`, {
           text: file.name,
           media_url: media.url,
-          media_type: file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'file',
+          media_type: mediaType,
           media_name: file.name,
+          media_file_id: media.file_id || null,
         });
         setMessages(m => [...m, msg]);
       } catch (err) {

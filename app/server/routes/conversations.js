@@ -83,8 +83,8 @@ router.get('/:id/messages', requireAuth(), async (req, res) => {
 // POST /api/conversations/:id/messages — send message
 router.post('/:id/messages', requireAuth(), async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text || !text.trim()) return res.status(400).json({ error: 'text required' });
+    const { text, media_url, media_type, media_name, media_file_id } = req.body;
+    if ((!text || !text.trim()) && !media_url) return res.status(400).json({ error: 'text or media required' });
 
     const conv = await one('SELECT * FROM conversations WHERE id = $1', [req.params.id]);
     if (!conv) return res.status(404).json({ error: 'Not found' });
@@ -96,9 +96,9 @@ router.post('/:id/messages', requireAuth(), async (req, res) => {
     }
 
     const msg = await one(
-      `INSERT INTO messages (conversation_id, sender_id, text)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [conv.id, userId, text.trim()]
+      `INSERT INTO messages (conversation_id, sender_id, text, media_url, media_type, media_name, media_file_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [conv.id, userId, (text || '').trim(), media_url || null, media_type || null, media_name || null, media_file_id || null]
     );
 
     await query(
@@ -114,8 +114,13 @@ router.post('/:id/messages', requireAuth(), async (req, res) => {
     } else {
       // Manager/admin reply → forward to the other participant in Telegram
       const recipientId = conv.participant_a === userId ? conv.participant_b : conv.participant_a;
-      forwardToTelegram(recipientId, req.user.name, text.trim()).catch(() => {});
+      forwardToTelegram(recipientId, req.user.name, text?.trim() || '', media_file_id, media_type, media_name).catch(() => {});
     }
+
+    // Push via SSE so recipient sees the message in real-time
+    const { sseClients } = require('../sse');
+    const sender = await one('SELECT name, role FROM users WHERE id = $1', [userId]);
+    sseClients.push(conv.id, { type: 'message', message: { ...msg, sender_name: sender?.name, sender_role: sender?.role } });
 
     res.status(201).json(msg);
   } catch (err) {

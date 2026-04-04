@@ -25,17 +25,27 @@ function tgPost(method, body) {
 }
 
 // Forward app message to user in Telegram (if they have telegram_id)
-async function forwardToTelegram(recipientId, senderName, text) {
+async function forwardToTelegram(recipientId, senderName, text, mediaFileId, mediaType, mediaName) {
   if (!BOT_TOKEN) return;
   try {
     const { one } = require('./db');
     const recipient = await one('SELECT telegram_id FROM users WHERE id = $1', [recipientId]);
     if (!recipient?.telegram_id) return;
-    await tgPost('sendMessage', {
-      chat_id: recipient.telegram_id,
-      text: `💬 <b>${senderName}</b>:\n${text}`,
-      parse_mode: 'HTML',
-    });
+
+    if (mediaFileId) {
+      const method = mediaType === 'image' ? 'sendPhoto' : mediaType === 'video' ? 'sendVideo' : 'sendDocument';
+      const field  = mediaType === 'image' ? 'photo'  : mediaType === 'video' ? 'video'  : 'document';
+      const caption = text && text !== mediaName
+        ? `💬 <b>${senderName}</b>:\n${text}`
+        : `💬 <b>${senderName}</b>`;
+      await tgPost(method, { chat_id: recipient.telegram_id, [field]: mediaFileId, caption, parse_mode: 'HTML' });
+    } else {
+      await tgPost('sendMessage', {
+        chat_id: recipient.telegram_id,
+        text: `💬 <b>${senderName}</b>:\n${text}`,
+        parse_mode: 'HTML',
+      });
+    }
   } catch {}
 }
 
@@ -94,27 +104,37 @@ async function notifyNewMessage(conv, msg, sender) {
   if (conv.type === 'model_internal') {
     // Model wrote to manager → notification in БУКИНГ (no approval needed)
     if (!BOOKING_CHAT_ID) return;
-    const text = `📱 <b>${sender.name}</b> написала в апці:\n${msg.text}`;
-    await tgPost('sendMessage', {
-      chat_id: BOOKING_CHAT_ID,
-      text,
-      parse_mode: 'HTML',
-      disable_notification: false,
-    });
+    if (msg.media_file_id) {
+      const method = msg.media_type === 'image' ? 'sendPhoto' : msg.media_type === 'video' ? 'sendVideo' : 'sendDocument';
+      const field  = msg.media_type === 'image' ? 'photo' : msg.media_type === 'video' ? 'video' : 'document';
+      const caption = `📱 <b>${sender.name}</b> надіслала файл в апці${msg.text && msg.text !== msg.media_name ? ':\n' + msg.text : ''}`;
+      await tgPost(method, { chat_id: BOOKING_CHAT_ID, [field]: msg.media_file_id, caption, parse_mode: 'HTML' });
+    } else {
+      await tgPost('sendMessage', {
+        chat_id: BOOKING_CHAT_ID,
+        text: `📱 <b>${sender.name}</b> написала в апці:\n${msg.text}`,
+        parse_mode: 'HTML',
+        disable_notification: false,
+      });
+    }
   } else if (conv.type === 'client_support') {
     // Client wrote → send to АПКА
     if (!APKA_CHAT_ID) return;
 
     const { query } = require('./db');
 
-    // 1. Send user message notification
+    // 1. Send user message notification (with file if present)
+    let notifResult;
+    if (msg.media_file_id) {
+      const method = msg.media_type === 'image' ? 'sendPhoto' : msg.media_type === 'video' ? 'sendVideo' : 'sendDocument';
+      const field  = msg.media_type === 'image' ? 'photo' : msg.media_type === 'video' ? 'video' : 'document';
+      const caption = `💬 <b>${sender.name}</b>${msg.text && msg.text !== msg.media_name ? ':\n' + msg.text : ''}\n\n<i>conv_id: ${conv.id} | msg_id: ${msg.id}</i>`;
+      notifResult = await tgPost(method, { chat_id: APKA_CHAT_ID, [field]: msg.media_file_id, caption, parse_mode: 'HTML' });
+    } else {
     const notifText = `💬 <b>${sender.name}</b> написав:\n${msg.text}\n\n<i>conv_id: ${conv.id} | msg_id: ${msg.id}</i>`;
-    const notifResult = await tgPost('sendMessage', {
-      chat_id: APKA_CHAT_ID,
-      text: notifText,
-      parse_mode: 'HTML',
-    });
-    if (notifResult.ok) {
+    notifResult = await tgPost('sendMessage', { chat_id: APKA_CHAT_ID, text: notifText, parse_mode: 'HTML' });
+    }
+    if (notifResult?.ok) {
       await query('UPDATE messages SET tg_message_id = $1 WHERE id = $2',
         [notifResult.result.message_id, msg.id]);
     }

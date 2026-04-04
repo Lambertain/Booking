@@ -21,7 +21,8 @@ router.post('/shoot', async (req, res) => {
 
     const { modelSlug, photographerName, photographerSite, photographerEmail,
             photographerPhone, photographerTelegram, dialogUrl,
-            shootDate, location, rate, currency, notes, status } = req.body;
+            shootDate, shootTime, durationHours, city, location, shootStyle,
+            rate, currency, expenses, notes, status } = req.body;
 
     if (!modelSlug || !photographerName) {
       return res.status(400).json({ error: 'modelSlug and photographerName required' });
@@ -34,16 +35,48 @@ router.post('/shoot', async (req, res) => {
     );
     if (!modelRow) return res.status(404).json({ error: `Model not found: ${modelSlug}` });
 
+    // Upsert: update if same dialog_url already exists for this model
+    if (dialogUrl) {
+      const existing = await one(
+        `SELECT id FROM shoots WHERE dialog_url = $1 AND model_id = $2`,
+        [dialogUrl, modelRow.id]
+      );
+      if (existing) {
+        await one(
+          `UPDATE shoots SET
+            photographer_name=$1, photographer_site=$2, photographer_email=$3,
+            photographer_phone=$4, photographer_telegram=$5,
+            shoot_date=$6, shoot_time=$7, duration_hours=$8,
+            city=$9, location=$10, shoot_style=$11,
+            rate=$12, currency=$13, expenses=$14, status=$15, notes=$16,
+            synced_from_bot_at=NOW()
+           WHERE id=$17 RETURNING id`,
+          [photographerName, photographerSite || null, photographerEmail || null,
+           photographerPhone || null, photographerTelegram || null,
+           shootDate || null, shootTime || null, durationHours || null,
+           city || null, location || null, shootStyle || null,
+           rate || null, currency || 'EUR', expenses || null,
+           status || 'negotiating', notes || null, existing.id]
+        );
+        console.log(`[sync] Shoot updated: ${photographerName} → model ${modelSlug} (id ${existing.id})`);
+        return res.json({ ok: true, shootId: existing.id, updated: true });
+      }
+    }
+
     const shoot = await one(
       `INSERT INTO shoots (model_id, photographer_name, photographer_site,
         photographer_email, photographer_phone, photographer_telegram,
-        dialog_url, shoot_date, location, rate, currency, status, notes, synced_from_bot_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+        dialog_url, shoot_date, shoot_time, duration_hours,
+        city, location, shoot_style, rate, currency, expenses,
+        status, notes, synced_from_bot_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
        RETURNING *`,
       [modelRow.id, photographerName, photographerSite || null,
        photographerEmail || null, photographerPhone || null, photographerTelegram || null,
-       dialogUrl || null, shootDate || null, location || null,
-       rate || null, currency || 'EUR', status || 'negotiating', notes || null]
+       dialogUrl || null, shootDate || null, shootTime || null, durationHours || null,
+       city || null, location || null, shootStyle || null,
+       rate || null, currency || 'EUR', expenses || null,
+       status || 'negotiating', notes || null]
     );
 
     console.log(`[sync] Shoot created: ${photographerName} → model ${modelSlug} (id ${shoot.id})`);

@@ -212,7 +212,12 @@ async function handleApprovalResult(action, text) {
       const appUrl = process.env.APP_API_URL;
       const secret = process.env.APP_API_SECRET;
       if (appUrl && secret) {
-        const location = [shootDetails?.city, shootDetails?.location].filter(Boolean).join(', ') || null;
+        // Extract date and time separately from ISO datetime
+        const isoTime = shootDetails?.startTime || null;
+        const shootDate = isoTime ? isoTime.split('T')[0] : null;
+        const shootTimePart = isoTime && isoTime.includes('T') ? isoTime.split('T')[1] : null;
+        const shootTime = shootTimePart && !shootTimePart.startsWith('00:00') ? shootTimePart.slice(0, 5) : null;
+
         const payload = {
           modelSlug,
           photographerName: item.photographer,
@@ -221,12 +226,17 @@ async function handleApprovalResult(action, text) {
           photographerPhone: shootDetails?.photographer_phone || null,
           photographerTelegram: shootDetails?.photographer_telegram || null,
           dialogUrl: item.url || null,
-          shootDate: shootDetails?.startTime || null,
-          location,
+          shootDate,
+          shootTime,
+          durationHours: shootDetails?.durationHours || null,
+          city: shootDetails?.city || null,
+          location: shootDetails?.location || null,
+          shootStyle: shootDetails?.style || null,
           rate: shootDetails?.budget || null,
           currency: shootDetails?.currency || 'EUR',
-          notes: [shootDetails?.style, shootDetails?.notes].filter(Boolean).join(' | ') || null,
-          status: shootDetails?.status === 'Подтверждено' ? 'confirmed' : 'negotiating',
+          expenses: shootDetails?.expenses || null,
+          notes: shootDetails?.notes || null,
+          status: (shootDetails?.status === 'Подтверждено' || shootDetails?.status === 'Підтверджено') ? 'confirmed' : 'negotiating',
         };
         const syncRes = await fetch(`${appUrl}/api/sync/shoot`, {
           method: 'POST',
