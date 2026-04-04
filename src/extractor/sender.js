@@ -76,17 +76,30 @@ async function sendAdultfolioReply(profileId, siteConfig, url, message, mediaFil
       return { ok: false, url, reason: 'empty message and no media' };
     }
 
+    // Count self-messages before submit
+    const selfPattern = siteConfig.selfProfilePattern || '';
+    const selfCountBefore = await page.evaluate((selfPat) => {
+      return [...document.querySelectorAll('.messageContainer')].filter(el => {
+        const href = el.querySelector('.thumbnailPic')?.getAttribute('href') || '';
+        return selfPat ? new RegExp(selfPat, 'i').test(href) : false;
+      }).length;
+    }, selfPattern);
+    console.log(`[sender] Adultfolio self-messages before: ${selfCountBefore}`);
+
     await page.locator(rf.submitSelector).click();
     await page.waitForTimeout(6000);
 
-    // Reload page and check if our text appears in the conversation
+    // Reload and count self-messages after
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForTimeout(2000);
-    const sent = await page.evaluate((msg) => {
-      const texts = [...document.querySelectorAll('[id^="message-content-"]')].map(el => el.innerText || '');
-      return texts.some(t => t.includes(msg.slice(0, 30)));
-    }, message);
-    if (!sent) throw new Error('Повідомлення не знайдено в розмові після відправки (adultfolio)');
+    const selfCountAfter = await page.evaluate((selfPat) => {
+      return [...document.querySelectorAll('.messageContainer')].filter(el => {
+        const href = el.querySelector('.thumbnailPic')?.getAttribute('href') || '';
+        return selfPat ? new RegExp(selfPat, 'i').test(href) : false;
+      }).length;
+    }, selfPattern);
+    console.log(`[sender] Adultfolio self-messages after: ${selfCountAfter}`);
+    if (selfCountAfter <= selfCountBefore) throw new Error('Повідомлення не з\'явилось у розмові після відправки (adultfolio)');
 
     return { ok: true, url };
   } finally {
