@@ -109,7 +109,7 @@ npm start
 2. Додати файли профілю в `models/<slug>/profile/` (reply-engine.md, rules.md, style.md, templates.md)
 3. Модель автоматично підхопиться scheduler'ом
 
-## Продакшн сервер
+## Продакшн сервер (бот)
 
 - **IP**: 185.203.242.10 (Windows Server)
 - **Директорія**: `C:\Booking`
@@ -120,3 +120,74 @@ npm start
 - **Логи**: `C:\Booking\data\output.log`, `C:\Booking\data\error.log`
 - **AdsPower**: http://local.adspower.net:50325 (тільки localhost)
 - **SSH**: `Administrator` / `7ow1s82cM41L` (тільки через paramiko Python)
+
+---
+
+# Мини-апп (app/)
+
+Telegram Mini App + веб-інтерфейс, що замінює Airtable (трекер зйомок) і SendPulse (комунікація з моделями та клієнтами).
+
+## Деплой
+
+- **URL**: https://booking-production-ab66.up.railway.app
+- **Хостинг**: Railway (Express API + React + PostgreSQL)
+- **Автодеплой**: push до `main` → Railway rebuild
+
+## Ролі
+
+| Роль | Доступ |
+|------|--------|
+| `admin` | все — моделі, зйомки, клієнти, користувачі, налаштування |
+| `manager` | призначені моделі: зйомки, клієнти, переписка |
+| `model` | свої зйомки, календар, тури, чат з менеджером |
+| `client` | свої замовлення розсилок, шаблони, чат з менеджером |
+
+## Telegram чати
+
+- **БУКИНГ** (-5132805901): AI ↔ фотографи, апрув менеджером. При апруві надсилаються **2 повідомлення**: переписка (до 4000 символів) + чернетка з кнопками OK/EDIT/SKIP
+- **АПКА** (-1002425111120): повідомлення з апки (клієнти/моделі) → Grok AI → апрув → відповідь в апку
+
+## Структура app/
+
+```
+app/
+├── server/
+│   ├── index.js              # Express entry, автоміграція БД, планувальник нагадувань
+│   ├── db.js                 # pg pool
+│   ├── migrations/           # SQL міграції (001–027)
+│   ├── bot-notify.js         # Telegram сповіщення + генерація AI чернетки (Grok)
+│   └── routes/
+│       ├── auth.js           # POST /api/auth/login, /tg
+│       ├── shoots.js         # CRUD зйомок
+│       ├── conversations.js  # Діалоги + SSE + POST /with-manager
+│       ├── messages.js       # Відправка/отримання повідомлень + медіа
+│       ├── orders.js         # CRUD замовлень розсилок
+│       ├── templates.js      # CRUD шаблонів розсилок
+│       ├── users.js          # Управління користувачами (admin)
+│       ├── broadcast.js      # Розсилки через Telegram бот
+│       ├── bot.js            # Webhook апрув відповідей з чату АПКА
+│       ├── analytics.js      # Статистика розсилок
+│       └── sync.js           # POST /api/sync/shoot (від бота)
+├── client/
+│   ├── App.jsx               # Роутинг по ролі
+│   ├── i18n/                 # Локалізація: uk.js, ru.js, en.js
+│   ├── screens/              # AnalyticsScreen, ChatsScreen, ClientsScreen,
+│   │                         # ModelDetail, ModelsScreen, SettingsScreen, ShootsList
+│   └── components/           # OrderSheet, TemplateSheet, ReminderConfig, ShootSheet, ...
+└── Dockerfile
+```
+
+## БД (PostgreSQL, Railway)
+
+Ключові таблиці: `users`, `agency_models`, `shoots`, `conversations`, `messages`, `mailing_orders`, `mailing_templates`, `clients`, `manager_models`, `subscribers`, `broadcast_logs`, `broadcast_message_templates`
+
+## Функціонал мини-апп
+
+- **Зйомки**: трекер зйомок по моделях, статуси, календар, sync з ботом
+- **Моделі**: профілі, сайти, стилі, тури. При додаванні туру — авто-створення карток розсилок по кожному сайту
+- **Клієнти**: замовлення розсилок та шаблони з детальними полями (deal, CRM, статистика сайтів, дедлайн, нагадування)
+- **Чати**: внутрішній чат моделі/клієнта з менеджером через SSE, апрув відповідей через Telegram
+- **Аналітика**: графіки розсилок (день/тиждень/місяць/рік), статистика по моделях
+- **Розсилки**: broadcast підписникам з тегами, шаблони повідомлень
+- **Нагадування**: автоматичні нагадування клієнтам перед дедлайном (налаштовуються в картці)
+- **Налаштування**: управління користувачами, мова (uk/ru/en), тема, impersonation

@@ -224,59 +224,12 @@ Booking бот вызывает этот endpoint в `onDeliveryResult()` при
 - bot-notify.js отправляет **тихое уведомление** в БУКИНГ (без кнопок, просто инфо)
 - Менеджер/букер видит что написала модель, отвечает прямо в апке
 
-## Поэтапный план разработки
+## Статус мини-апп
 
-### Этап 1 — Scaffold + БД
-- [ ] Создать Railway проект + PostgreSQL сервис
-- [ ] `app/` директория, package.json, Express entry
-- [ ] migrations/001_init.sql — все таблицы
-- [ ] db.js с автомиграцией при старте
-- [ ] Seed: создать admin пользователя, 4 модели
-
-### Этап 2 — Auth
-- [ ] POST /api/auth/login (email + password → JWT)
-- [ ] POST /api/auth/tg (Telegram initData → JWT для модели/клиента)
-- [ ] Middleware checkAuth(roles[])
-- [ ] Login page (React)
-
-### Этап 3 — Shoots (замена Airtable)
-- [ ] CRUD /api/shoots (фильтр по model_id, статус)
-- [ ] Страница Manager: таблица съёмок, фильтры, статус
-- [ ] Страница Model: свои съёмки + календарь
-- [ ] POST /api/sync/shoot — sync endpoint для бота
-- [ ] Вызов sync из booking бота (onDeliveryResult)
-
-### Этап 4 — Conversations (замена SendPulse)
-- [ ] CRUD /api/conversations, /api/messages
-- [ ] SSE /api/conversations/:id/events
-- [ ] Страница чата (Manager + Model + Client)
-- [ ] bot-notify.js — отправка в чат АПКА при новом сообщении
-- [ ] Grammy handler в booking боте — апрув ответов из чата АПКА
-- [ ] Уведомления от моделей → чат БУКИНГ (без апрува)
-
-### Этап 5 — Clients + Orders (замена Airtable клиентов)
-- [ ] CRUD /api/clients, /api/orders, /api/templates
-- [ ] Страница Manager: клиенты, заказы рассылок
-- [ ] Страница Client: свои заказы + шаблоны
-
-### Этап 6 — Admin panel
-- [ ] Управление пользователями (создать/заблокировать)
-- [ ] Назначение менеджер → модели
-- [ ] Просмотр всех данных
-
-### Этап 7 — Деплой + интеграция
-- [ ] Dockerfile для Railway
-- [ ] Railway environment variables
-- [ ] Обновить booking бот: добавить вызов /api/sync/shoot
-- [ ] Тест полного флоу: съёмка апрувится → появляется в апке
-- [ ] Тест чата: клиент пишет → приходит в АПКА → апрув → ответ в апке
-
-### Этап 8 — Telegram Mini App (TWA)
-- [ ] Добавить Telegram Web App SDK в React
-- [ ] initData авторизация (модели и клиенты входят через Telegram)
-- [ ] Кнопка в @lambertain_bot открывает апку
-- [ ] Адаптивный mobile UI
-
-## Миграция данных
-- Airtable → shoots: экспорт CSV → import script
-- SendPulse → conversations: API даёт только subscriber list (имя, telegram_id, переменные) — история диалогов недоступна, начинаем с нуля
+Приложение полностью в продакшене на Railway. Все этапы реализованы:
+- Auth (email + JWT), роли, Telegram initData
+- Съёмки: CRUD, статусы, календарь, sync с ботом
+- Чаты: SSE, апрув через АПКА, уведомления в БУКИНГ
+- Клиенты: заказы рассылок, шаблоны, поля deal/CRM/дедлайн
+- Аналитика, рассылки, нагадування
+- Пользователи, impersonation, локализация uk/ru/en
