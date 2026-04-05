@@ -157,4 +157,140 @@ router.get('/', requireAuth('admin', 'manager'), async (req, res) => {
   }
 });
 
+// GET /api/analytics/chats?period=week&tz=+02:00
+router.get('/chats', requireAuth('admin', 'manager'), async (req, res) => {
+  try {
+    const period = req.query.period || 'week';
+    const tz = req.query.tz || '+00:00';
+
+    const tzMatch = tz.match(/([+-])(\d{2}):(\d{2})/);
+    const tzOffsetMin = tzMatch
+      ? (tzMatch[1] === '+' ? 1 : -1) * (parseInt(tzMatch[2]) * 60 + parseInt(tzMatch[3]))
+      : 0;
+
+    const nowUtcMs = Date.now();
+    const localMs  = nowUtcMs + tzOffsetMin * 60000;
+    const localNow = new Date(localMs);
+    const ly = localNow.getUTCFullYear();
+    const lm = localNow.getUTCMonth();
+    const ld = localNow.getUTCDate();
+
+    function localToUtc(y, mo, d, h, mi, s, ms) {
+      return new Date(Date.UTC(y, mo, d, h, mi, s, ms) - tzOffsetMin * 60000);
+    }
+
+    let trunc, from, to;
+    if (period === 'day') {
+      trunc = 'hour';
+      from = localToUtc(ly, lm, ld, 0, 0, 0, 0);
+      to   = localToUtc(ly, lm, ld, 23, 59, 59, 999);
+    } else if (period === 'week') {
+      trunc = 'day';
+      const weekAgo = new Date(localMs - 6 * 86400000);
+      from = localToUtc(weekAgo.getUTCFullYear(), weekAgo.getUTCMonth(), weekAgo.getUTCDate(), 0, 0, 0, 0);
+      to   = localToUtc(ly, lm, ld, 23, 59, 59, 999);
+    } else if (period === 'month') {
+      trunc = 'day';
+      from = localToUtc(ly, lm, 1, 0, 0, 0, 0);
+      to   = localToUtc(ly, lm, ld, 23, 59, 59, 999);
+    } else {
+      trunc = 'month';
+      from = localToUtc(ly, 0, 1, 0, 0, 0, 0);
+      to   = localToUtc(ly, lm, ld, 23, 59, 59, 999);
+    }
+
+    const fromIso = from.toISOString();
+    const toIso   = to.toISOString();
+
+    // --- Totals ---
+    const totals = await one(`
+      SELECT
+        COUNT(*) FILTER (WHERE ai_draft IS NOT NULL)                       AS total,
+        COUNT(*) FILTER (WHERE bot_action = 'approved')                    AS approved,
+        COUNT(*) FILTER (WHERE bot_action = 'edited')                      AS edited,
+        COUNT(*) FILTER (WHERE bot_action = 'skipped')                     AS skipped,
+        COUNT(*) FILTER (WHERE ai_draft IS NOT NULL AND bot_action IS NULL) AS pending
+      FROM messages
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [fromIso, toIso]);
+
+    // --- Chart per time bucket ---
+    const chartRows = await all(`
+      SELECT
+        date_trunc($1, created_at AT TIME ZONE $4) AS bucket,
+        COUNT(*) FILTER (WHERE bot_action = 'approved') AS approved,
+        COUNT(*) FILTER (WHERE bot_action = 'edited')   AS edited,
+        COUNT(*) FILTER (WHERE bot_action = 'skipped')  AS skipped
+      FROM messages
+      WHERE ai_draft IS NOT NULL AND created_at >= $2 AND created_at <= $3
+      GROUP BY bucket
+      ORDER BY bucket
+    `, [trunc, fromIso, toIso, tz]);
+
+    // --- AI learning: last 20 edited messages (draft vs what manager sent) ---
+    const learningRows = await all(`
+      SELECT
+        m.id, m.created_at, m.ai_draft, m.ai_edited_text,
+        sender.name AS sender_name, sender.role AS sender_role,
+        c.type AS conv_type
+      FROM messages m
+      JOIN users sender ON sender.id = m.sender_id
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE m.bot_action = 'edited'
+        AND m.ai_edited_text IS NOT NULL
+        AND m.created_at >= $1 AND m.created_at <= $2
+      ORDER BY m.created_at DESC
+      LIMIT 20
+    `, [fromIso, toIso]);
+
+    // --- Approval rate over all time (for trend) ---
+    const allTime = await one(`
+      SELECT
+        COUNT(*) FILTER (WHERE bot_action = 'approved') AS approved,
+        COUNT(*) FILTER (WHERE bot_action = 'edited')   AS edited,
+        COUNT(*) FILTER (WHERE bot_action = 'skipped')  AS skipped,
+        COUNT(*) FILTER (WHERE ai_draft IS NOT NULL)    AS total
+      FROM messages
+      WHERE ai_draft IS NOT NULL
+    `, []);
+
+    res.json({
+      period, from: fromIso, to: toIso,
+      totals: {
+        total:    parseInt(totals?.total    || 0),
+        approved: parseInt(totals?.approved || 0),
+        edited:   parseInt(totals?.edited   || 0),
+        skipped:  parseInt(totals?.skipped  || 0),
+        pending:  parseInt(totals?.pending  || 0),
+      },
+      chart: chartRows.map(r => ({
+        bucket:   r.bucket,
+        approved: parseInt(r.approved || 0),
+        edited:   parseInt(r.edited   || 0),
+        skipped:  parseInt(r.skipped  || 0),
+      })),
+      learning: learningRows.map(r => ({
+        id:          r.id,
+        created_at:  r.created_at,
+        sender_name: r.sender_name,
+        conv_type:   r.conv_type,
+        ai_draft:    r.ai_draft,
+        manager_sent: r.ai_edited_text,
+      })),
+      allTime: {
+        total:    parseInt(allTime?.total    || 0),
+        approved: parseInt(allTime?.approved || 0),
+        edited:   parseInt(allTime?.edited   || 0),
+        skipped:  parseInt(allTime?.skipped  || 0),
+        rate: allTime?.total > 0
+          ? Math.round(parseInt(allTime.approved) / parseInt(allTime.total) * 100)
+          : null,
+      },
+    });
+  } catch (err) {
+    console.error('[analytics/chats]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

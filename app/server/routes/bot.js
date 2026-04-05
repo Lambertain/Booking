@@ -248,8 +248,8 @@ async function handleEditReply(tgChatId, editedText, tgUser) {
   const { deliverApprovedReply, forwardToTelegram } = require('../bot-notify');
   await deliverApprovedReply(conv.id, editedText, approverId);
 
-  // Record analytics: edited
-  await query('UPDATE messages SET bot_action = $1 WHERE id = $2', ['edited', pending.msgId]).catch(() => {});
+  // Record analytics: edited + store what manager actually sent (for AI learning)
+  await query('UPDATE messages SET bot_action = $1, ai_edited_text = $2 WHERE id = $3', ['edited', editedText, pending.msgId]).catch(() => {});
 
   const recipientId = conv.participant_a === approverId ? conv.participant_b : conv.participant_a;
   const senderName = approverUser?.name || 'Менеджер';
