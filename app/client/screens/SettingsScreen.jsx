@@ -11,12 +11,7 @@ const LANGS = [
   { code: 'en', label: 'English' },
 ];
 
-const IMPERSONATE_ROLES = [
-  { role: 'manager', label: 'Manager' },
-  { role: 'model',   label: 'Model' },
-  { role: 'client',  label: 'Client' },
-  { role: 'user',    label: 'User' },
-];
+const IMPERSONATE_ROLE_KEYS = ['manager', 'model', 'client', 'user'];
 
 export default function SettingsScreen({ user, onLogout, onImpersonate, impersonatedRole }) {
   const { t, lang, setLang } = useLang();
@@ -109,11 +104,11 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
         <TopBar
-          title="Users"
-          left={<button className="back-btn" onClick={() => setUsersView(false)}>‹ {t('back')}</button>}
+          title={t('users.title')}
+          left={<button className="back-btn" onClick={() => setUsersView(false)}>{t('back')}</button>}
           right={
             <button className="btn btn-sm btn-secondary" onClick={() => setCreateSheet(true)}>
-              + Add
+              {t('add')}
             </button>
           }
         />
@@ -131,7 +126,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                   fontWeight: roleTab === r ? 600 : 400,
                 }}
               >
-                {r === 'all' ? `All (${users.length})` : `${r.charAt(0).toUpperCase() + r.slice(1)} (${users.filter(u => u.role === r).length})`}
+                {r === 'all' ? `${t('all')} (${users.length})` : `${r.charAt(0).toUpperCase() + r.slice(1)} (${users.filter(u => u.role === r).length})`}
               </button>
             ))}
           </div>
@@ -171,7 +166,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                         onClick={() => openAssign(u)}
                         style={{ fontSize: 11 }}
                       >
-                        Models
+                        {t('nav.models')}
                       </button>
                     )}
                     {u.id !== user.id && (
@@ -181,7 +176,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                           onClick={() => toggleBlock(u)}
                           style={{ fontSize: 11, background: u.is_active ? 'var(--bg4)' : 'var(--green)', color: u.is_active ? 'var(--red)' : '#fff', borderRadius: 8, padding: '4px 8px', border: 'none', cursor: 'pointer' }}
                         >
-                          {u.is_active ? 'Block' : 'Unblock'}
+                          {u.is_active ? t('users.block') : t('users.unblock')}
                         </button>
                         <button
                           onClick={() => deleteUser(u)}
@@ -200,32 +195,32 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
         </div>
 
         {/* Create user sheet */}
-        <Sheet open={createSheet} onClose={() => setCreateSheet(false)} title="Add user">
+        <Sheet open={createSheet} onClose={() => setCreateSheet(false)} title={t('users.register')}>
           <div className="input-group">
-            <div className="input-label">Name</div>
-            <input value={newUser.name} onChange={e => setNewUser(u => ({ ...u, name: e.target.value }))} placeholder="Full name" />
+            <div className="input-label">{t('users.name')}</div>
+            <input value={newUser.name} onChange={e => setNewUser(u => ({ ...u, name: e.target.value }))} placeholder={t('users.name')} />
           </div>
           <div className="input-group">
-            <div className="input-label">Telegram username</div>
-            <input value={newUser.telegram_username} onChange={e => setNewUser(u => ({ ...u, telegram_username: e.target.value }))} placeholder="without @" />
+            <div className="input-label">{t('users.telegram')}</div>
+            <input value={newUser.telegram_username} onChange={e => setNewUser(u => ({ ...u, telegram_username: e.target.value }))} placeholder={t('models.instagramPh')} />
           </div>
           <div className="input-group">
-            <div className="input-label">Role</div>
+            <div className="input-label">{t('users.role')}</div>
             <select value={newUser.role} onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))}>
-              <option value="user">User</option>
-              <option value="manager">Manager</option>
-              <option value="model">Model</option>
-              <option value="client">Client</option>
-              <option value="admin">Admin</option>
+              <option value="user">user</option>
+              <option value="manager">manager</option>
+              <option value="model">model</option>
+              <option value="client">client</option>
+              <option value="admin">admin</option>
             </select>
           </div>
           <button className="btn btn-primary btn-full" onClick={createUser} disabled={creating || !newUser.name}>
-            {creating ? '...' : 'Create'}
+            {creating ? t('saving') : t('users.create')}
           </button>
         </Sheet>
 
         {/* Assign models to manager sheet */}
-        <Sheet open={!!assignSheet} onClose={() => setAssignSheet(null)} title={`Assign models to ${assignSheet?.name}`}>
+        <Sheet open={!!assignSheet} onClose={() => setAssignSheet(null)} title={`${t('settings.assignModels')} — ${assignSheet?.name}`}>
           <div className="card">
             {modelsList.map(m => (
               <div key={m.id} className="list-item" onClick={() => toggleAssign(m.id)} style={{ cursor: 'pointer' }}>
@@ -268,10 +263,10 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
       {/* Admin: users management */}
       {isAdmin && (
         <div style={{ padding: '0 16px 8px' }}>
-          <div className="list-section-title">Team</div>
+          <div className="list-section-title">{t('settings.team')}</div>
           <div className="card">
             <div className="settings-row" onClick={openUsers} style={{ cursor: 'pointer' }}>
-              <span style={{ fontSize: 15 }}>Manage users</span>
+              <span style={{ fontSize: 15 }}>{t('settings.manageUsers')}</span>
               <span className="chevron" />
             </div>
           </div>
@@ -288,9 +283,9 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
                 <span style={{ color: 'var(--accent)', fontSize: 15 }}>{t('settings.exitImpersonate')}</span>
               </div>
             ) : (
-              IMPERSONATE_ROLES.map(({ role, label }) => (
+              IMPERSONATE_ROLE_KEYS.map(role => (
                 <div key={role} className="settings-row" onClick={() => onImpersonate(role)} style={{ cursor: 'pointer' }}>
-                  <span style={{ fontSize: 15 }}>View as {label}</span>
+                  <span style={{ fontSize: 15 }}>{t('settings.viewAs')} {role}</span>
                   <span className="chevron" />
                 </div>
               ))

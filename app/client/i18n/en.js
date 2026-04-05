@@ -366,5 +366,9 @@ export default {
     selectUser: 'Select user...',
     account: 'Account',
     logout: 'Logout',
+    team: 'Team',
+    manageUsers: 'Manage users',
+    viewAs: 'View as',
+    assignModels: 'Assign models',
   },
 };

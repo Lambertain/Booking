@@ -372,5 +372,9 @@ export default {
     selectUser: 'Оберіть користувача...',
     account: 'Акаунт',
     logout: 'Вийти',
+    team: 'Команда',
+    manageUsers: 'Управління користувачами',
+    viewAs: 'Перегляд як',
+    assignModels: 'Призначити моделі',
   },
 };

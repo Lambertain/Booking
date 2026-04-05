@@ -366,5 +366,9 @@ export default {
     selectUser: 'Выберите пользователя...',
     account: 'Аккаунт',
     logout: 'Выйти',
+    team: 'Команда',
+    manageUsers: 'Управление пользователями',
+    viewAs: 'Просмотр как',
+    assignModels: 'Назначить модели',
   },
 };

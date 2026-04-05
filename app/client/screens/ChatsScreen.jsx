@@ -534,9 +534,9 @@ function ChatThread({ conv, user, onBack }) {
         <div className="input-group">
           <div className="input-label">{t('users.role')}</div>
           <select value={regForm.role} onChange={e => setRegForm(f => ({ ...f, role: e.target.value }))}>
-            <option value="model">Model</option>
-            <option value="client">Client</option>
-            <option value="manager">Manager</option>
+            <option value="model">model</option>
+            <option value="client">client</option>
+            <option value="manager">manager</option>
           </select>
         </div>
         <button className="btn btn-primary btn-full" onClick={registerUser}>{t('users.create')}</button>
