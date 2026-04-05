@@ -137,8 +137,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
     setTourSheet(false);
 
     // Create one mailing order card per active site
-    const sitesToCreate = activeSites.length > 0 ? activeSites : [{ id: '', label: '' }];
-    for (const site of sitesToCreate) {
+    for (const site of activeSites) {
       try {
         const siteLabel = site.label ? ` [${site.label}]` : '';
         const label = `${model.display_name || model.name}${siteLabel} — ${tour.city}${tour.date_from ? `, ${tour.date_from}` : ''}${tour.date_to ? ` – ${tour.date_to}` : ''}`;
