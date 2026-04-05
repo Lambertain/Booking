@@ -27,12 +27,22 @@ function formatConversationHistory(item) {
   const available = LIMIT - header.length - 2;
 
   // Last message always goes in full (it may be from photographer or model)
-  // Then prepend older messages while they fit
+  // Then prepend older messages while they fit; if one doesn't fit fully — take its tail with "..."
   let body = lines[lines.length - 1];
   for (let i = lines.length - 2; i >= 0; i--) {
-    const candidate = lines[i] + '\n\n' + body;
-    if (candidate.length > available) break;
-    body = candidate;
+    const sep = '\n\n';
+    const full = lines[i] + sep + body;
+    if (full.length <= available) {
+      body = full;
+    } else {
+      // Take as much of this message as fits, prefixed with "..."
+      const room = available - sep.length - body.length - 3; // 3 for "..."
+      if (room > 10) {
+        const partial = '...' + lines[i].slice(lines[i].length - room);
+        body = partial + sep + body;
+      }
+      break;
+    }
   }
 
   return header + '\n\n' + escapeMarkdown(body);
