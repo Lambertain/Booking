@@ -112,7 +112,7 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
             </button>
           }
         />
-        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--topbar-h) 16px 120px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--topbar-h) 16px calc(var(--tabbar-h) + 16px)' }}>
           {/* Role tabs */}
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' }}>
             {ROLE_TABS.map(r => (
