@@ -259,12 +259,35 @@ export default function ChatsScreen({ user, onChatActive }) {
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
 
-  const canBroadcast = user.role === 'admin' || user.role === 'manager';
+  const isManager = user.role === 'admin' || user.role === 'manager';
+  const canBroadcast = isManager;
 
   useEffect(() => {
-    api.get('/api/conversations').then(setConvs).finally(() => setLoading(false));
+    api.get('/api/conversations').then(convList => {
+      setConvs(convList);
+      // For non-manager roles: auto-open if exactly 1 conversation
+      if (!isManager && convList.length === 1) {
+        setActive(convList[0]);
+        onChatActive?.(true);
+      }
+    }).finally(() => setLoading(false));
   }, []);
+
+  async function startChatWithManager() {
+    setStartingChat(true);
+    try {
+      const conv = await api.post('/api/conversations/with-manager', {});
+      setConvs([conv]);
+      setActive(conv);
+      onChatActive?.(true);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setStartingChat(false);
+    }
+  }
 
   if (active) {
     return (
@@ -309,6 +332,16 @@ export default function ChatsScreen({ user, onChatActive }) {
           <div className="empty">
             <div className="empty-icon">💬</div>
             <div className="empty-title">{t('conversations.noChats')}</div>
+            {!isManager && (
+              <button
+                className="btn btn-primary"
+                style={{ marginTop: 12 }}
+                onClick={startChatWithManager}
+                disabled={startingChat}
+              >
+                {startingChat ? t('loading') : t('nav.chat')}
+              </button>
+            )}
           </div>
         ) : convs.map(c => {
           const name = convName(c);

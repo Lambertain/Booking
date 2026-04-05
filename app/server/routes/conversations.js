@@ -144,6 +144,50 @@ router.get('/:id/events', requireAuth(), async (req, res) => {
   });
 });
 
+// POST /api/conversations/with-manager — find or create conversation with first available manager/admin
+router.post('/with-manager', requireAuth('model', 'client', 'user'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const convType = req.user.role === 'model' ? 'model_internal' : 'client_support';
+
+    // Find an admin/manager user (prefer assigned manager for model, otherwise first admin)
+    let manager = null;
+    if (req.user.role === 'model') {
+      manager = await one(
+        `SELECT u.id FROM users u
+         JOIN manager_models mm ON mm.manager_id = u.id
+         JOIN agency_models am ON am.user_id = $1 AND am.id = mm.model_id
+         WHERE u.is_active = TRUE LIMIT 1`,
+        [userId]
+      );
+    }
+    if (!manager) {
+      manager = await one(
+        `SELECT id FROM users WHERE role IN ('admin','manager') AND is_active = TRUE ORDER BY role DESC LIMIT 1`,
+        []
+      );
+    }
+    if (!manager) return res.status(404).json({ error: 'No manager available' });
+
+    const a = Math.min(userId, manager.id);
+    const b = Math.max(userId, manager.id);
+    let conv = await one(
+      `SELECT * FROM conversations WHERE LEAST(participant_a, participant_b) = $1
+       AND GREATEST(participant_a, participant_b) = $2`,
+      [a, b]
+    );
+    if (!conv) {
+      conv = await one(
+        `INSERT INTO conversations (type, participant_a, participant_b) VALUES ($1,$2,$3) RETURNING *`,
+        [convType, userId, manager.id]
+      );
+    }
+    res.json(conv);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/conversations — create or get existing
 router.post('/', requireAuth('admin', 'manager', 'model', 'client', 'user'), async (req, res) => {
   try {
