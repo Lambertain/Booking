@@ -136,18 +136,23 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
     setNewTour({ city: '', date_from: '', date_to: '' });
     setTourSheet(false);
 
-    // Create mailing order card for this tour
-    try {
-      const label = `${model.display_name || model.name} — Тур: ${tour.city}${tour.date_from ? `, ${tour.date_from}` : ''}${tour.date_to ? ` – ${tour.date_to}` : ''}`;
-      await api.post('/api/orders', {
-        template_name: label,
-        responsible: model.display_name || model.name,
-        rental_start: tour.date_from || null,
-        rental_end: tour.date_to || null,
-        order_type: 'rent',
-      });
-    } catch (e) {
-      console.error('[tour] Failed to create mailing order:', e.message);
+    // Create one mailing order card per active site
+    const sitesToCreate = activeSites.length > 0 ? activeSites : [{ id: '', label: '' }];
+    for (const site of sitesToCreate) {
+      try {
+        const siteLabel = site.label ? ` [${site.label}]` : '';
+        const label = `${model.display_name || model.name}${siteLabel} — ${tour.city}${tour.date_from ? `, ${tour.date_from}` : ''}${tour.date_to ? ` – ${tour.date_to}` : ''}`;
+        await api.post('/api/orders', {
+          template_name: label,
+          responsible: model.display_name || model.name,
+          rental_start: tour.date_from || null,
+          rental_end: tour.date_to || null,
+          order_type: 'rent',
+          sites: site.label || null,
+        });
+      } catch (e) {
+        console.error('[tour] Failed to create mailing order for site', site.label, e.message);
+      }
     }
   }
   function removeTour(i) {
