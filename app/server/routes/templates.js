@@ -36,7 +36,7 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
     const {
       name, rental_start, rental_end, deal_step, responsible,
       price, model_sites, accesses, contact_name, contact_email,
-      source_type, deal_type, created_by,
+      source_type, deal_type, created_by, accounts, deadline,
     } = req.body;
     const updates = [];
     const vals = [];
@@ -54,6 +54,8 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
     if (source_type !== undefined)   { updates.push(`source_type = $${i++}`);   vals.push(source_type); }
     if (deal_type !== undefined)     { updates.push(`deal_type = $${i++}`);     vals.push(deal_type); }
     if (created_by !== undefined)    { updates.push(`created_by = $${i++}`);    vals.push(created_by || null); }
+    if (accounts !== undefined)      { updates.push(`accounts = $${i++}`);      vals.push(accounts); }
+    if (deadline !== undefined)      { updates.push(`deadline = $${i++}`);      vals.push(deadline || null); }
 
     const { subscriber_id } = req.body;
     if (subscriber_id !== undefined) {

@@ -13,9 +13,28 @@ const STATUS_COLORS = {
   cancelled: 'var(--text3)',
 };
 
+const SITES = [
+  { key: 'adultfolio', label: 'Adultfolio', hasIndex: false },
+  { key: 'purpleport', label: 'PurplePort', hasIndex: false },
+  { key: 'modelmayhem', label: 'ModelMayhem', hasIndex: false },
+  { key: 'modelkartei', label: 'Model-Kartei', hasIndex: true },
+];
+
 function fmt(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fmtDatetime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function addDays(dateStr, days) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
 function Row({ label, value }) {
@@ -24,6 +43,114 @@ function Row({ label, value }) {
     <div style={{ display: 'flex', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--separator)' }}>
       <span style={{ color: 'var(--text3)', fontSize: 13, minWidth: 110 }}>{label}</span>
       <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, wordBreak: 'break-word' }}>{value}</span>
+    </div>
+  );
+}
+
+function SiteStatsView({ stats, t }) {
+  const [open, setOpen] = useState(null);
+  if (!stats) return null;
+  const hasAny = SITES.some(s => stats[s.key] && Object.keys(stats[s.key]).some(k => stats[s.key][k]));
+  if (!hasAny) return null;
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        {t('mailings.siteStats')}
+      </div>
+      {SITES.map(site => {
+        const s = stats[site.key] || {};
+        const hasData = Object.keys(s).some(k => s[k]);
+        if (!hasData) return null;
+        const isOpen = open === site.key;
+        return (
+          <div key={site.key} style={{ marginBottom: 4 }}>
+            <button
+              onClick={() => setOpen(isOpen ? null : site.key)}
+              style={{ background: 'var(--bg3)', border: 'none', borderRadius: 8, padding: '6px 12px', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{site.label}</span>
+              <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                {s.count ? `${s.count} фото` : ''}{s.radius ? ` • ${s.radius}км` : ''} {isOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {isOpen && (
+              <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: '0 0 8px 8px', fontSize: 13 }}>
+                {s.launched_at && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ color: 'var(--text3)' }}>{t('mailings.launchedAt')}</span><span>{fmtDatetime(s.launched_at)}</span></div>}
+                {s.finished_at && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ color: 'var(--text3)' }}>{t('mailings.finishedAt')}</span><span>{fmtDatetime(s.finished_at)}</span></div>}
+                {s.radius && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ color: 'var(--text3)' }}>{t('mailings.radius')}</span><span>{s.radius}</span></div>}
+                {s.count && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ color: 'var(--text3)' }}>{t('mailings.sentCount')}</span><span>{s.count}</span></div>}
+                {site.hasIndex && s.index && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ color: 'var(--text3)' }}>{t('mailings.siteIndex')}</span><span>{s.index}</span></div>}
+                {s.db_updated_at && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ color: 'var(--text3)' }}>{t('mailings.dbUpdatedAt')}</span><span>{fmtDatetime(s.db_updated_at)}</span></div>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SiteStatsEdit({ value, onChange, t }) {
+  const [open, setOpen] = useState(null);
+  const stats = value || {};
+
+  function setSite(siteKey, field, val) {
+    const updated = { ...stats, [siteKey]: { ...(stats[siteKey] || {}), [field]: val } };
+    onChange(updated);
+  }
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        {t('mailings.siteStats')}
+      </div>
+      {SITES.map(site => {
+        const s = stats[site.key] || {};
+        const isOpen = open === site.key;
+        return (
+          <div key={site.key} style={{ marginBottom: 6 }}>
+            <button
+              type="button"
+              onClick={() => setOpen(isOpen ? null : site.key)}
+              style={{ background: 'var(--bg3)', border: 'none', borderRadius: isOpen ? '8px 8px 0 0' : 8, padding: '8px 12px', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{site.label}</span>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{isOpen ? '▲' : '▼'}</span>
+            </button>
+            {isOpen && (
+              <div style={{ padding: '10px 12px', background: 'var(--bg2)', borderRadius: '0 0 8px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <div className="input-label">{t('mailings.launchedAt')}</div>
+                  <input type="datetime-local" value={s.launched_at || ''} onChange={e => setSite(site.key, 'launched_at', e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <div className="input-label">{t('mailings.finishedAt')}</div>
+                  <input type="datetime-local" value={s.finished_at || ''} onChange={e => setSite(site.key, 'finished_at', e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <div className="input-label">{t('mailings.radius')}</div>
+                  <input type="number" value={s.radius || ''} onChange={e => setSite(site.key, 'radius', e.target.value)} style={{ fontSize: 12 }} placeholder="км" />
+                </div>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <div className="input-label">{t('mailings.sentCount')}</div>
+                  <input type="number" value={s.count || ''} onChange={e => setSite(site.key, 'count', e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                {site.hasIndex && (
+                  <div className="input-group" style={{ margin: 0 }}>
+                    <div className="input-label">{t('mailings.siteIndex')}</div>
+                    <input type="number" value={s.index || ''} onChange={e => setSite(site.key, 'index', e.target.value)} style={{ fontSize: 12 }} />
+                  </div>
+                )}
+                <div className="input-group" style={{ margin: 0, gridColumn: site.hasIndex ? '2' : '1 / span 2' }}>
+                  <div className="input-label">{t('mailings.dbUpdatedAt')}</div>
+                  <input type="datetime-local" value={s.db_updated_at || ''} onChange={e => setSite(site.key, 'db_updated_at', e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -47,6 +174,12 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
     sale: t('mailings.orderTypeLabels.sale'),
   };
 
+  // Effective deadline: explicit or auto-calc from rental_end + 28 days
+  const effDeadline = order.deadline
+    ? new Date(order.deadline)
+    : order.rental_end ? addDays(order.rental_end, 28) : null;
+  const isAutoDeadline = !order.deadline && !!order.rental_end;
+
   function openEdit() {
     setForm({
       template_name: order.template_name || '',
@@ -63,8 +196,11 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
       responsible: order.responsible || '',
       price: order.price || '',
       deal_currency: order.deal_currency || '',
+      payment: order.payment || '',
+      deadline: order.deadline ? order.deadline.slice(0, 10) : '',
       notes: order.notes || '',
       deal_step: order.deal_step || '',
+      site_stats: order.site_stats || {},
       linked: '',
     });
     setEditing(true);
@@ -173,6 +309,18 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
           </div>
 
           <div className="input-group">
+            <div className="input-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{t('mailings.deadline')}</span>
+              {!form.deadline && form.rental_end && (
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                  {t('mailings.deadlineAuto')}: {fmt(addDays(form.rental_end, 28))}
+                </span>
+              )}
+            </div>
+            <input type="date" value={form.deadline} onChange={e => set('deadline', e.target.value)} placeholder={t('mailings.deadlineAuto')} />
+          </div>
+
+          <div className="input-group">
             <div className="input-label">{t('mailings.contactName')}</div>
             <input value={form.contact_name} onChange={e => set('contact_name', e.target.value)} />
           </div>
@@ -201,12 +349,20 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
               </div>
             </div>
           </div>
+
+          <div className="input-group">
+            <div className="input-label">{t('mailings.payment')}</div>
+            <input value={form.payment} onChange={e => set('payment', e.target.value)} placeholder="оплачено / не оплачено..." />
+          </div>
+
           <div className="input-group">
             <div className="input-label">{t('mailings.notes')}</div>
             <textarea rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} style={{ resize: 'vertical' }} />
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <SiteStatsEdit value={form.site_stats} onChange={v => set('site_stats', v)} t={t} />
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>{t('cancel')}</button>
             <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
               {saving ? t('saving') : t('save')}
@@ -229,6 +385,15 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
                 {TYPE_LABELS[order.order_type] || order.order_type}
               </span>
             )}
+            {effDeadline && (() => {
+              const daysLeft = Math.ceil((effDeadline - new Date()) / 86400000);
+              const urgent = daysLeft <= 2;
+              return (
+                <span style={{ background: urgent ? 'var(--red, #ff3b30)' : 'var(--bg3)', color: urgent ? '#fff' : 'var(--text2)', borderRadius: 8, padding: '3px 10px', fontSize: 12 }}>
+                  ⏰ {fmt(effDeadline)}{isAutoDeadline ? ` (${t('mailings.deadlineAuto')})` : ''}
+                </span>
+              );
+            })()}
           </div>
 
           <Row label={t('mailings.client')} value={order.client_name} />
@@ -238,12 +403,16 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
           <Row label={t('mailings.contactPhone')} value={order.contact_phone} />
           <Row label={t('mailings.tour1')} value={order.rental_start && `${fmt(order.rental_start)} — ${fmt(order.rental_end)}`} />
           <Row label={t('mailings.tour2')} value={order.tour_start_2 && `${fmt(order.tour_start_2)} — ${fmt(order.tour_end_2)}`} />
+          <Row label={t('mailings.deadline')} value={effDeadline && `${fmt(effDeadline)}${isAutoDeadline ? ` (${t('mailings.deadlineAuto')})` : ''}`} />
           <Row label={t('mailings.modelSites')} value={order.model_sites} />
           <Row label={t('mailings.responsible')} value={order.responsible} />
           <Row label={t('mailings.price')} value={order.price > 0 && `${order.price} ${order.deal_currency || 'EUR'}`} />
+          <Row label={t('mailings.payment')} value={order.payment} />
           <Row label={t('mailings.notes')} value={order.notes} />
           <Row label={t('mailings.created')} value={fmt(order.created_at)} />
           <Row label={t('mailings.dealId')} value={order.deal_id} />
+
+          <SiteStatsView stats={order.site_stats} t={t} />
 
           {canEdit && (
             <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={openEdit}>

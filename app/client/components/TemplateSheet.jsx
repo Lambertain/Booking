@@ -16,6 +16,13 @@ function fmt(d) {
   return new Date(d).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function addDays(dateStr, days) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 function Row({ label, value }) {
   if (!value) return null;
   return (
@@ -39,6 +46,17 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
     return key ? t('templates.stepLabels.' + key) : s;
   }
 
+  const TYPE_LABELS = {
+    rent: t('mailings.orderTypeLabels.rent'),
+    sale: t('mailings.orderTypeLabels.sale'),
+  };
+
+  // Effective deadline: explicit or auto-calc from rental_end + 28 days
+  const effDeadline = template.deadline
+    ? new Date(template.deadline)
+    : template.rental_end ? addDays(template.rental_end, 28) : null;
+  const isAutoDeadline = !template.deadline && !!template.rental_end;
+
   function openEdit() {
     setForm({
       name: template.name || '',
@@ -46,11 +64,13 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
       price: template.price || '',
       rental_start: template.rental_start ? template.rental_start.slice(0, 10) : '',
       rental_end: template.rental_end ? template.rental_end.slice(0, 10) : '',
+      deadline: template.deadline ? template.deadline.slice(0, 10) : '',
       model_sites: template.model_sites || '',
       accesses: template.accesses || '',
+      accounts: template.accounts || '',
       contact_name: template.contact_name || '',
       contact_email: template.contact_email || '',
-      deal_type: template.deal_type || '',
+      deal_type: template.deal_type || 'rent',
       responsible: template.responsible || '',
       linked: '',
     });
@@ -130,6 +150,14 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
             <input value={form.deal_step} onChange={e => set('deal_step', e.target.value)} placeholder={t('templates.crmStatusPh')} />
           </div>
 
+          <div className="input-group">
+            <div className="input-label">{t('templates.dealType')}</div>
+            <select value={form.deal_type} onChange={e => set('deal_type', e.target.value)}>
+              <option value="rent">{TYPE_LABELS.rent}</option>
+              <option value="sale">{TYPE_LABELS.sale}</option>
+            </select>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div className="input-group">
               <div className="input-label">{t('templates.rentalFrom')}</div>
@@ -139,6 +167,23 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
               <div className="input-label">{t('to')}</div>
               <input type="date" value={form.rental_end} onChange={e => set('rental_end', e.target.value)} />
             </div>
+          </div>
+
+          <div className="input-group">
+            <div className="input-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{t('templates.deadline')}</span>
+              {!form.deadline && form.rental_end && (
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                  {t('templates.deadlineAuto')}: {fmt(addDays(form.rental_end, 28))}
+                </span>
+              )}
+            </div>
+            <input type="date" value={form.deadline} onChange={e => set('deadline', e.target.value)} placeholder={t('templates.deadlineAuto')} />
+          </div>
+
+          <div className="input-group">
+            <div className="input-label">{t('templates.accounts')}</div>
+            <textarea rows={2} value={form.accounts} onChange={e => set('accounts', e.target.value)} placeholder="ana-v, kate-m..." style={{ resize: 'vertical' }} />
           </div>
 
           <div className="input-group">
@@ -163,8 +208,8 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
               <input type="number" value={form.price} onChange={e => set('price', e.target.value)} />
             </div>
             <div className="input-group">
-              <div className="input-label">{t('templates.dealType')}</div>
-              <input value={form.deal_type} onChange={e => set('deal_type', e.target.value)} />
+              <div className="input-label">{t('templates.responsible')}</div>
+              <input value={form.responsible} onChange={e => set('responsible', e.target.value)} />
             </div>
           </div>
 
@@ -177,10 +222,15 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
         </div>
       ) : (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             {template.deal_step && (
               <span style={{ background: stepColor, color: '#fff', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
                 {getStepLabel(template.deal_step)}
+              </span>
+            )}
+            {template.deal_type && (
+              <span style={{ background: 'var(--bg3)', color: 'var(--text2)', borderRadius: 8, padding: '3px 10px', fontSize: 12 }}>
+                {TYPE_LABELS[template.deal_type] || template.deal_type}
               </span>
             )}
             {template.price > 0 && (
@@ -188,16 +238,26 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
                 💶 {template.price} EUR
               </span>
             )}
+            {effDeadline && (() => {
+              const daysLeft = Math.ceil((effDeadline - new Date()) / 86400000);
+              const urgent = daysLeft <= 2;
+              return (
+                <span style={{ background: urgent ? 'var(--red, #ff3b30)' : 'var(--bg3)', color: urgent ? '#fff' : 'var(--text2)', borderRadius: 8, padding: '3px 10px', fontSize: 12 }}>
+                  ⏰ {fmt(effDeadline)}{isAutoDeadline ? ` (${t('templates.deadlineAuto')})` : ''}
+                </span>
+              );
+            })()}
           </div>
 
           <Row label={t('templates.contactName')} value={template.contact_name} />
           <Row label={t('templates.email')} value={template.contact_email} />
           <Row label={t('templates.modelSites')} value={template.model_sites} />
+          <Row label={t('templates.accounts')} value={template.accounts} />
           <Row label={t('templates.accesses')} value={template.accesses} />
-          <Row label={t('templates.dealType')} value={template.deal_type} />
           <Row label={t('templates.responsible')} value={template.responsible} />
           <Row label={t('templates.rentalFrom')} value={template.rental_start && `${fmt(template.rental_start)} — ${fmt(template.rental_end)}`} />
           <Row label={t('templates.validUntil')} value={!template.rental_start && template.rental_end && fmt(template.rental_end)} />
+          <Row label={t('templates.deadline')} value={effDeadline && `${fmt(effDeadline)}${isAutoDeadline ? ` (${t('templates.deadlineAuto')})` : ''}`} />
           <Row label={t('templates.created')} value={fmt(template.created_at)} />
           <Row label={t('templates.dealId')} value={template.deal_id} />
 
