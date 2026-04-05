@@ -42,9 +42,13 @@ router.post('/webhook', async (req, res) => {
     const update = req.body;
 
     // Forward БУКИНГ updates to Windows Server booking bot
+    // Exception: apka_* callbacks are app-level (model chat approval) — handle here
     if (isBookingUpdate(update)) {
-      forwardToBookingBot(update);
-      return;
+      const cbAction = update.callback_query?.data?.split(':')?.[0] || '';
+      if (!cbAction.startsWith('apka_')) {
+        forwardToBookingBot(update);
+        return;
+      }
     }
 
     // --- callback_query (button press) ---
