@@ -240,10 +240,6 @@ export default function SettingsScreen({ user, onLogout, onImpersonate, imperson
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 16px 8px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('settings.title')}</h1>
-      </div>
-
       {/* Account */}
       <div style={{ padding: '0 16px 8px' }}>
         <div className="list-section-title">{t('settings.account')}</div>

@@ -319,8 +319,7 @@ export default function ChatsScreen({ user, onChatActive }) {
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('nav.chats')}</h1>
+      <div style={{ padding: '8px 16px 8px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         {canBroadcast && (
           <button
             onClick={() => setBroadcastOpen(true)}

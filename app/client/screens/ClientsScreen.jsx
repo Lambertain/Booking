@@ -176,7 +176,6 @@ export default function ClientsScreen({ user }) {
   return (
     <div className="screen">
       <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>{t('clients.title')}</h1>
         {canEdit && tab !== 'contacts' && (
           <button
             onClick={() => tab === 'mailings' ? setOrderSheet(true) : setTemplateSheet(true)}

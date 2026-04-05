@@ -57,9 +57,7 @@ export default function ModelsScreen({ user }) {
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 16px 8px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t('nav.models')}</h1>
-      </div>
+
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {models.map(m => {
           const now = new Date();
