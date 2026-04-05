@@ -341,6 +341,8 @@ export default {
     selectedCount: 'Selected: {n}',
     message: 'Reminder message',
     messagePh: 'Your rental expires on {date}...',
+    inactive: 'Inactive',
+    showInactive: 'Inactive',
     loadTemplate: 'Template',
     saveTemplate: 'Save as template',
   },

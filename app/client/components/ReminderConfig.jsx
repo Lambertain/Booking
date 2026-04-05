@@ -10,6 +10,7 @@ export default function ReminderConfig({ value, onChange, allSubscribers, msgTem
   const cfg = value || {};
 
   const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
   const [savingTpl, setSavingTpl] = useState(false);
   const [tplName, setTplName] = useState('');
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -20,6 +21,7 @@ export default function ReminderConfig({ value, onChange, allSubscribers, msgTem
   const selectedIds = cfg.recipient_ids || [];
   const selectedSubs = (allSubscribers || []).filter(s => selectedIds.includes(s.id));
   const filteredSubs = (allSubscribers || []).filter(s => {
+    if (!showInactive && s.status !== 'active') return false;
     if (!search.trim()) return true;
     const term = search.toLowerCase();
     return (s.full_name || '').toLowerCase().includes(term)
@@ -53,9 +55,8 @@ export default function ReminderConfig({ value, onChange, allSubscribers, msgTem
     setShowTplPicker(false);
   }
 
-  function statusBadge(sub) {
-    if (sub.status === 'blocked') return { label: '🚫', color: 'var(--red, #ff3b30)' };
-    return { label: '✅', color: 'var(--green, #34c759)' };
+  function statusLabel(sub) {
+    return sub.status === 'active' ? t('users.active') : t('reminder.inactive');
   }
 
   return (
@@ -88,41 +89,51 @@ export default function ReminderConfig({ value, onChange, allSubscribers, msgTem
         {/* Selected badges */}
         {selectedSubs.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-            {selectedSubs.map(sub => {
-              const badge = statusBadge(sub);
-              return (
-                <span
-                  key={sub.id}
-                  onClick={() => toggleRecipient(sub.id)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: 'var(--accent-bg, rgba(10,132,255,0.12))', color: 'var(--accent)',
-                    borderRadius: 20, padding: '3px 10px 3px 6px', fontSize: 12, cursor: 'pointer',
-                    border: '1px solid var(--accent)',
-                  }}
-                >
-                  <span style={{ fontSize: 10 }}>{badge.label}</span>
-                  {sub.full_name || sub.username || `tg:${sub.telegram_id}`}
-                  <span style={{ fontSize: 14, lineHeight: 1, opacity: 0.7 }}>×</span>
-                </span>
-              );
-            })}
+            {selectedSubs.map(sub => (
+              <span
+                key={sub.id}
+                onClick={() => toggleRecipient(sub.id)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: 'var(--accent-bg, rgba(10,132,255,0.12))', color: 'var(--accent)',
+                  borderRadius: 20, padding: '3px 10px 3px 8px', fontSize: 12, cursor: 'pointer',
+                  border: '1px solid var(--accent)',
+                }}
+              >
+                {sub.full_name || sub.username || `tg:${sub.telegram_id}`}
+                <span style={{ fontSize: 14, lineHeight: 1, opacity: 0.7 }}>×</span>
+              </span>
+            ))}
           </div>
         )}
 
-        {/* Search + list */}
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={t('reminder.searchRecipients')}
-          style={{ marginBottom: 4 }}
-        />
+        {/* Search + inactive toggle */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={t('reminder.searchRecipients')}
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowInactive(x => !x)}
+            style={{
+              flexShrink: 0, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: 'none',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              background: showInactive ? 'var(--orange, #ff9500)' : 'var(--bg3)',
+              color: showInactive ? '#fff' : 'var(--text3)',
+            }}
+          >
+            {t('reminder.showInactive')}
+          </button>
+        </div>
         <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--separator)', borderRadius: 8 }}>
           {filteredSubs.length === 0 ? (
             <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text3)' }}>{t('reminder.noContacts')}</div>
           ) : filteredSubs.slice(0, 50).map(sub => {
             const selected = selectedIds.includes(sub.id);
-            const badge = statusBadge(sub);
+            const isActive = sub.status === 'active';
             return (
               <div
                 key={sub.id}
@@ -134,18 +145,13 @@ export default function ReminderConfig({ value, onChange, allSubscribers, msgTem
                 }}
               >
                 <span style={{ fontSize: 16 }}>{selected ? '☑' : '☐'}</span>
-                <span style={{
-                  fontSize: 10, padding: '1px 5px', borderRadius: 4,
-                  background: sub.status === 'blocked' ? 'rgba(255,59,48,0.15)' : 'rgba(52,199,89,0.15)',
-                  color: sub.status === 'blocked' ? 'var(--red, #ff3b30)' : 'var(--green, #34c759)',
-                  fontWeight: 600, flexShrink: 0,
-                }}>
-                  {sub.status === 'blocked' ? t('users.blocked') : t('users.active')}
-                </span>
                 <span style={{ fontSize: 13, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {sub.full_name || '—'}
                   {sub.username && <span style={{ color: 'var(--text3)', marginLeft: 4 }}>@{sub.username}</span>}
                 </span>
+                {!isActive && (
+                  <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0 }}>{t('reminder.inactive')}</span>
+                )}
               </div>
             );
           })}

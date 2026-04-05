@@ -354,6 +354,8 @@ export default {
     selectedCount: 'Обрано: {n}',
     message: 'Текст нагадування',
     messagePh: 'Ваша оренда закінчується {date}...',
+    inactive: 'Неактивний',
+    showInactive: 'Неактивні',
     loadTemplate: 'Шаблон',
     saveTemplate: 'Зберегти шаблон',
   },
