@@ -4,20 +4,22 @@ function formatConversationHistory(item) {
     `📸 *${escapeMarkdown(item.photographer || 'Unknown')}*`,
     `🌐 ${escapeMarkdown(item.siteLabel)}`,
     `👤 ${escapeMarkdown(item.model)}`,
-    '',
-    '💬 *Переписка:*',
   ].join('\n');
 
   const LIMIT = 3900;
   const messages = item.messages || [];
+  const modelName = item.model || 'Model';
+  const photographerName = item.photographer || 'Photographer';
 
   // Build formatted lines (chronological order)
   const lines = [];
   for (const m of messages) {
-    const who = m.role === 'self' ? '▶' : '◀';
+    const isSelf = m.role === 'self';
+    const name = isSelf ? modelName : photographerName;
+    const arrow = isSelf ? '▶' : '◀';
     const text = (m.text || '').replace(/\n{3,}/g, '\n\n').trim();
     if (!text) continue;
-    lines.push(`${who} ${text}`);
+    lines.push(`${name} ${arrow} ${text}`);
   }
 
   if (lines.length === 0) {
