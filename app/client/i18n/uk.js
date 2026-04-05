@@ -344,6 +344,20 @@ export default {
     lastErrors: '⚠️ Останні помилки доставки:',
   },
 
+  reminder: {
+    title: 'Нагадування клієнту',
+    daysBefore: 'Нагадати за',
+    daysUnit: 'днів до терміну',
+    recipients: 'Отримувачі',
+    searchRecipients: 'Пошук контакту...',
+    noContacts: 'Контактів не знайдено',
+    selectedCount: 'Обрано: {n}',
+    message: 'Текст нагадування',
+    messagePh: 'Ваша оренда закінчується {date}...',
+    loadTemplate: 'Шаблон',
+    saveTemplate: 'Зберегти шаблон',
+  },
+
   settings: {
     title: 'Налаштування',
     language: 'Мова',

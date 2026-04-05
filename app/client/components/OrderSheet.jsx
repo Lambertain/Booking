@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../api.js';
 import { useLang } from '../i18n/useLang.js';
+import ReminderConfig from './ReminderConfig.jsx';
 
 const STATUSES = ['new', 'in_progress', 'done', 'cancelled'];
 const ORDER_TYPES = ['rent', 'sale'];
@@ -155,7 +156,7 @@ function SiteStatsEdit({ value, onChange, t }) {
   );
 }
 
-export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUsers, allSubscribers }) {
+export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUsers, allSubscribers, msgTemplates, onTemplatesSaved }) {
   const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
@@ -201,6 +202,7 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
       notes: order.notes || '',
       deal_step: order.deal_step || '',
       site_stats: order.site_stats || {},
+      reminder_config: order.reminder_config || {},
       linked: '',
     });
     setEditing(true);
@@ -361,6 +363,16 @@ export default function OrderSheet({ order, onClose, canEdit, onUpdated, allUser
           </div>
 
           <SiteStatsEdit value={form.site_stats} onChange={v => set('site_stats', v)} t={t} />
+
+          <div style={{ height: 1, background: 'var(--separator)', margin: '16px 0' }} />
+
+          <ReminderConfig
+            value={form.reminder_config}
+            onChange={v => set('reminder_config', v)}
+            allSubscribers={allSubscribers}
+            msgTemplates={msgTemplates}
+            onTemplatesSaved={onTemplatesSaved}
+          />
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>{t('cancel')}</button>

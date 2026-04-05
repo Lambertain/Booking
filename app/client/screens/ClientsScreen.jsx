@@ -71,6 +71,7 @@ export default function ClientsScreen({ user }) {
   const canEdit = user.role === 'admin' || user.role === 'manager';
 
   const [pickerSubs, setPickerSubs] = useState([]);
+  const [msgTemplates, setMsgTemplates] = useState([]);
 
   // Localized status labels (computed from locale)
   const STATUS_LABELS = {
@@ -106,13 +107,15 @@ export default function ClientsScreen({ user }) {
       canEdit ? api.get('/api/orders/clients') : Promise.resolve([]),
       canEdit ? api.get('/api/users') : Promise.resolve([]),
       canEdit ? api.get('/api/broadcast/list?status=active') : Promise.resolve([]),
+      canEdit ? api.get('/api/broadcast/message-templates') : Promise.resolve([]),
     ];
-    Promise.all(loads).then(([o, tpl, cl, users, subs]) => {
+    Promise.all(loads).then(([o, tpl, cl, users, subs, mtpl]) => {
       setOrders(o);
       setTemplates(tpl);
       setClients(cl);
       setAllUsers(Array.isArray(users) ? users : []);
       setPickerSubs(Array.isArray(subs) ? subs : []);
+      setMsgTemplates(Array.isArray(mtpl) ? mtpl : []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -625,6 +628,8 @@ export default function ClientsScreen({ user }) {
         canEdit={canEdit}
         allUsers={allUsers}
         allSubscribers={pickerSubs}
+        msgTemplates={msgTemplates}
+        onTemplatesSaved={() => api.get('/api/broadcast/message-templates').then(setMsgTemplates)}
         onUpdated={updated => {
           setOrders(os => os.map(x => x.id === updated.id ? updated : x));
           setSelectedOrder(updated);
@@ -687,6 +692,8 @@ export default function ClientsScreen({ user }) {
         canEdit={canEdit}
         allUsers={allUsers}
         allSubscribers={pickerSubs}
+        msgTemplates={msgTemplates}
+        onTemplatesSaved={() => api.get('/api/broadcast/message-templates').then(setMsgTemplates)}
         onUpdated={updated => {
           setTemplates(ts => ts.map(x => x.id === updated.id ? updated : x));
           setSelectedTemplate(updated);

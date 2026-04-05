@@ -106,7 +106,7 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
       responsible, price, deal_step, tour_start_2, tour_end_2,
       source_type, user_id,
       review, lesson, contact_phone, deal_currency,
-      site_stats, deadline, payment,
+      site_stats, deadline, payment, reminder_config,
     } = req.body;
     const updates = [];
     const vals = [];
@@ -147,7 +147,8 @@ router.patch('/:id', requireAuth('admin', 'manager'), async (req, res) => {
     if (deal_currency !== undefined) { updates.push(`deal_currency = $${i++}`); vals.push(deal_currency); }
     if (site_stats !== undefined)   { updates.push(`site_stats = $${i++}`);   vals.push(JSON.stringify(site_stats)); }
     if (deadline !== undefined)     { updates.push(`deadline = $${i++}`);     vals.push(deadline || null); }
-    if (payment !== undefined)      { updates.push(`payment = $${i++}`);      vals.push(payment); }
+    if (payment !== undefined)         { updates.push(`payment = $${i++}`);         vals.push(payment); }
+    if (reminder_config !== undefined) { updates.push(`reminder_config = $${i++}`); vals.push(JSON.stringify(reminder_config)); }
 
     // subscriber_id: direct link to subscribers table
     const { subscriber_id } = req.body;

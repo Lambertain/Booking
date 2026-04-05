@@ -331,6 +331,20 @@ export default {
     failed: 'Failed',
   },
 
+  reminder: {
+    title: 'Client reminder',
+    daysBefore: 'Remind',
+    daysUnit: 'days before deadline',
+    recipients: 'Recipients',
+    searchRecipients: 'Search contact...',
+    noContacts: 'No contacts found',
+    selectedCount: 'Selected: {n}',
+    message: 'Reminder message',
+    messagePh: 'Your rental expires on {date}...',
+    loadTemplate: 'Template',
+    saveTemplate: 'Save as template',
+  },
+
   settings: {
     title: 'Settings',
     language: 'Language',

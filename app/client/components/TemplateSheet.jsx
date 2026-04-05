@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../api.js';
 import { useLang } from '../i18n/useLang.js';
+import ReminderConfig from './ReminderConfig.jsx';
 
 const STEP_COLORS = {
   'В работе': 'var(--accent)',
@@ -33,7 +34,7 @@ function Row({ label, value }) {
   );
 }
 
-export default function TemplateSheet({ template, onClose, canEdit, onUpdated, allUsers, allSubscribers }) {
+export default function TemplateSheet({ template, onClose, canEdit, onUpdated, allUsers, allSubscribers, msgTemplates, onTemplatesSaved }) {
   const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
@@ -72,6 +73,7 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
       contact_email: template.contact_email || '',
       deal_type: template.deal_type || 'rent',
       responsible: template.responsible || '',
+      reminder_config: template.reminder_config || {},
       linked: '',
     });
     setEditing(true);
@@ -213,7 +215,17 @@ export default function TemplateSheet({ template, onClose, canEdit, onUpdated, a
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ height: 1, background: 'var(--separator)', margin: '16px 0' }} />
+
+          <ReminderConfig
+            value={form.reminder_config}
+            onChange={v => set('reminder_config', v)}
+            allSubscribers={allSubscribers}
+            msgTemplates={msgTemplates}
+            onTemplatesSaved={onTemplatesSaved}
+          />
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button className="btn btn-secondary btn-full" onClick={() => setEditing(false)}>{t('cancel')}</button>
             <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
               {saving ? t('saving') : t('save')}
