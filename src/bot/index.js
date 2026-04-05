@@ -2,7 +2,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'
 const fs = require('fs');
 const path = require('path');
 const { Bot } = require('grammy');
-const { formatApprovalCard, buildApprovalKeyboard, collectPhotographerImages } = require('./messages');
+const { formatConversationHistory, formatDraftCard, formatApprovalCardPlain, buildApprovalKeyboard, collectPhotographerImages } = require('./messages');
 const { chat: agentChat } = require('../ai/agent');
 const { takeNext, queueLength } = require('../pipeline/queue');
 const { addToSendQueue } = require('../pipeline/send-queue');
@@ -108,17 +108,27 @@ async function tryShowNextCard() {
 
   console.log(`[bot] Надсилаю на апрув: ${item.photographer} (${item.siteLabel}). Черга: ${len - 1}`);
 
-  const text = formatApprovalCard(item);
-  const keyboard = buildApprovalKeyboard(item.approvalId);
+  const historyText = formatConversationHistory(item);
+  const draftText   = formatDraftCard(item);
+  const keyboard    = buildApprovalKeyboard(item.approvalId);
 
   try {
-    await bot.api.sendMessage(CHAT_ID, text, { parse_mode: 'MarkdownV2', reply_markup: keyboard });
+    // Message 1: conversation history (no buttons)
+    await bot.api.sendMessage(CHAT_ID, historyText, { parse_mode: 'MarkdownV2' });
   } catch {
     try {
-      const plain = `📸 ${item.photographer} | ${item.siteLabel} | ${item.model}\n\n💬 INCOMING:\n${item.lastIncoming}\n\n✏️ DRAFT:\n${item.draft}`;
-      await bot.api.sendMessage(CHAT_ID, plain, { reply_markup: keyboard });
+      await bot.api.sendMessage(CHAT_ID, `📸 ${item.photographer} | ${item.siteLabel}\n\n💬 INCOMING:\n${item.lastIncoming}`);
+    } catch {}
+  }
+
+  try {
+    // Message 2: draft + approve buttons
+    await bot.api.sendMessage(CHAT_ID, draftText, { parse_mode: 'MarkdownV2', reply_markup: keyboard });
+  } catch {
+    try {
+      await bot.api.sendMessage(CHAT_ID, formatApprovalCardPlain(item), { reply_markup: keyboard });
     } catch (err2) {
-      console.error('Failed to send card:', err2.message);
+      console.error('Failed to send draft card:', err2.message);
       currentApproval = null;
     }
   }
