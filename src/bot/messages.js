@@ -11,7 +11,7 @@ function formatConversationHistory(item) {
   const LIMIT = 3900;
   const messages = item.messages || [];
 
-  // Build lines newest-first, then reverse so we take the tail up to limit
+  // Build formatted lines (chronological order)
   const lines = [];
   for (const m of messages) {
     const who = m.role === 'self' ? '▶' : '◀';
@@ -20,16 +20,22 @@ function formatConversationHistory(item) {
     lines.push(`${who} ${text}`);
   }
 
-  // Take as many recent messages as fit
+  if (lines.length === 0) {
+    return header + '\n\n' + escapeMarkdown('(немає повідомлень)');
+  }
+
   const available = LIMIT - header.length - 2;
-  let body = '';
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const candidate = lines[i] + (body ? '\n\n' + body : '');
+
+  // Last message always goes in full (it may be from photographer or model)
+  // Then prepend older messages while they fit
+  let body = lines[lines.length - 1];
+  for (let i = lines.length - 2; i >= 0; i--) {
+    const candidate = lines[i] + '\n\n' + body;
     if (candidate.length > available) break;
     body = candidate;
   }
 
-  return header + '\n\n' + escapeMarkdown(body || '(немає повідомлень)');
+  return header + '\n\n' + escapeMarkdown(body);
 }
 
 // Message 2: draft with approve buttons
