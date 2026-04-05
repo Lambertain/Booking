@@ -178,7 +178,7 @@ export default function ModelDetail({ model, shoots, onBack, canEdit, isOwner, o
         title={profile.display_name || model.name}
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', paddingTop: 'var(--topbar-h)', paddingBottom: 'var(--tabbar-h)' }}>
+      <div style={{ flex: 1, overflowY: 'auto', paddingTop: 'var(--topbar-h)', paddingBottom: 'calc(var(--tabbar-h) + 16px)' }}>
 
         {/* Header */}
         <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 14 }}>

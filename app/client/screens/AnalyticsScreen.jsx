@@ -143,7 +143,7 @@ export default function AnalyticsScreen() {
   });
 
   return (
-    <div className="screen" style={{ paddingBottom: 'calc(var(--tabbar-h) + 16px)' }}>
+    <div className="screen">
       <div style={{ padding: '16px 16px 0' }}>
 
         {/* Model selector — replaces title */}

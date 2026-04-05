@@ -266,10 +266,14 @@ export default function ChatsScreen({ user, onChatActive }) {
 
   useEffect(() => {
     api.get('/api/conversations').then(convList => {
-      setConvs(convList);
-      // For non-manager roles: auto-open if exactly 1 conversation
-      if (!isManager && convList.length === 1) {
-        setActive(convList[0]);
+      // Non-managers only see their own conversations (client-side safety filter)
+      const filtered = isManager
+        ? convList
+        : convList.filter(c => c.participant_a === user.id || c.participant_b === user.id);
+      setConvs(filtered);
+      // Auto-open if exactly 1 conversation
+      if (!isManager && filtered.length === 1) {
+        setActive(filtered[0]);
         onChatActive?.(true);
       }
     }).finally(() => setLoading(false));

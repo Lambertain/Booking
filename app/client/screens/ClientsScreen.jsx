@@ -231,7 +231,7 @@ export default function ClientsScreen({ user }) {
             })}
           </div>
 
-          <div style={{ padding: '0 16px 80px' }}>
+          <div style={{ padding: '0 16px 16px' }}>
             {filteredOrders.length === 0 ? (
               <div className="empty">
                 <div className="empty-icon">📋</div>
@@ -325,7 +325,7 @@ export default function ClientsScreen({ user }) {
             })}
           </div>
 
-          <div style={{ padding: '0 16px 80px' }}>
+          <div style={{ padding: '0 16px 16px' }}>
             {filteredTemplates.length === 0 ? (
               <div className="empty">
                 <div className="empty-icon">📄</div>
@@ -392,7 +392,7 @@ export default function ClientsScreen({ user }) {
       )}
 
       {tab === 'contacts' && canEdit && (
-        <div style={{ padding: '0 16px 80px' }}>
+        <div style={{ padding: '0 16px 16px' }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input
               value={subSearch}

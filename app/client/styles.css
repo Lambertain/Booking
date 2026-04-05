@@ -85,7 +85,7 @@ h3 { font-size: 17px; font-weight: 600; }
 .screen {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 24px;
+  padding-bottom: calc(var(--tabbar-h) + 16px);
 }
 
 /* Sub-screens with fixed TopBar */
@@ -93,10 +93,10 @@ h3 { font-size: 17px; font-weight: 600; }
   flex: 1;
   overflow-y: auto;
   padding-top: var(--topbar-h);
-  padding-bottom: 24px;
+  padding-bottom: calc(var(--tabbar-h) + 16px);
 }
 
-.screen-content { padding: 0 16px 24px; }
+.screen-content { padding: 0 16px calc(var(--tabbar-h) + 16px); }
 
 /* ── Top Bar ── */
 .topbar {
